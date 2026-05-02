@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
+from django.utils.functional import cached_property
 from django.utils import timezone
 
 
@@ -151,7 +152,7 @@ class OwnedCard(models.Model):
         if errors:
             raise ValidationError(errors)
 
-    @property
+    @cached_property
     def unit_value(self) -> Decimal | None:
         from collection.services.pricing import adjust_owned_price_value, select_cardmarket_price
 
@@ -170,9 +171,10 @@ class OwnedCard(models.Model):
 
     @property
     def row_value(self) -> Decimal | None:
-        if self.unit_value is None:
+        unit_value = self.unit_value
+        if unit_value is None:
             return None
-        return self.unit_value * self.quantity
+        return unit_value * self.quantity
 
 
 class OCRJob(models.Model):

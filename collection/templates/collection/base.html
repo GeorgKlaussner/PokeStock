@@ -8,7 +8,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>{% block title %}PokeStock{% endblock %}</title>
+  <link rel="preconnect" href="https://images.pokemontcg.io">
+  <link rel="dns-prefetch" href="//images.pokemontcg.io">
   <link rel="stylesheet" href="{% static 'pokestock.css' %}">
+  {% if request.user.is_authenticated %}
+    <script src="{% static 'navigation.js' %}" defer></script>
+  {% endif %}
 </head>
 <body class="{% if request.user.is_authenticated %}authenticated{% else %}guest{% endif %}">
   {% with active=request.resolver_match.url_name %}

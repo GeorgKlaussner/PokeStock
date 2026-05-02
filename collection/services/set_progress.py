@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 
-from django.db.models import Sum
+from django.db.models import Count, Min, Sum
 
 from collection.models import CardMetadata, OwnedCard, SetMetadata
 from collection.services.pokemon_tcg import PokemonTCGClient, upsert_card_metadata, upsert_set_metadata
@@ -72,20 +72,21 @@ def _build_set_progresses(set_ids: Iterable[str]) -> dict[str, SetProgress]:
         item.external_id: item
         for item in SetMetadata.objects.filter(external_id__in=normalized_set_ids)
     }
-    cards_by_set: dict[str, list[CardMetadata]] = defaultdict(list)
-    for card in CardMetadata.objects.filter(set_id__in=normalized_set_ids):
-        cards_by_set[card.set_id].append(card)
-    owned_quantities_by_set = _owned_quantities_by_set(normalized_set_ids)
+    cached_cards_by_set = _cached_card_counts_by_set(normalized_set_ids)
+    representatives_by_set = _representative_cards_by_set(normalized_set_ids)
+    owned_totals_by_set = _owned_totals_by_set(normalized_set_ids)
 
     progresses: dict[str, SetProgress] = {}
     for set_id in normalized_set_ids:
-        cards = cards_by_set.get(set_id, [])
         set_metadata = set_metadatas.get(set_id)
+        owned_totals = owned_totals_by_set.get(set_id, (0, 0))
         progress = _build_set_progress(
             set_id,
-            cards,
+            cached_cards_by_set.get(set_id, 0),
             set_metadata,
-            owned_quantities_by_set.get(set_id, {}),
+            representatives_by_set.get(set_id),
+            owned_card_count=owned_totals[0],
+            owned_quantity=owned_totals[1],
         )
         if progress is not None:
             progresses[set_id] = progress
@@ -94,21 +95,20 @@ def _build_set_progresses(set_ids: Iterable[str]) -> dict[str, SetProgress]:
 
 def _build_set_progress(
     set_id: str,
-    cards: list[CardMetadata],
+    cached_cards: int,
     set_metadata: SetMetadata | None,
-    owned_quantities: dict[int, int],
+    representative: CardMetadata | None,
+    *,
+    owned_card_count: int,
+    owned_quantity: int,
 ) -> SetProgress | None:
-    if not cards and set_metadata is None:
+    if cached_cards == 0 and set_metadata is None:
         return None
 
-    owned_card_count = sum(1 for card in cards if owned_quantities.get(card.id, 0) > 0)
-    owned_quantity = sum(owned_quantities.values())
-    cached_cards = len(cards)
     catalog_total = (set_metadata.total or set_metadata.printed_total) if set_metadata else 0
     total_cards = catalog_total or cached_cards
     missing_cards = max(total_cards - owned_card_count, 0)
     completion_percent = round((owned_card_count / total_cards) * 100) if total_cards else 0
-    representative = cards[0] if cards else None
     return SetProgress(
         set_id=set_id,
         set_name=(set_metadata.name if set_metadata else "")
@@ -131,15 +131,23 @@ def _build_set_progress(
 
 
 def set_card_progress(set_id: str) -> tuple[SetProgress | None, list[SetCardProgress]]:
-    progress = set_progress(set_id)
-    if progress is None:
-        return None, []
-
+    set_metadata = SetMetadata.objects.filter(external_id=set_id).first()
     owned_quantities = _owned_quantities(set_id)
     cards = sorted(
         CardMetadata.objects.filter(set_id=set_id),
         key=lambda card: (_card_number_sort_key(card.card_number), card.name),
     )
+    progress = _build_set_progress(
+        set_id,
+        len(cards),
+        set_metadata,
+        cards[0] if cards else None,
+        owned_card_count=sum(1 for card in cards if owned_quantities.get(card.id, 0) > 0),
+        owned_quantity=sum(owned_quantities.values()),
+    )
+    if progress is None:
+        return None, []
+
     return progress, [
         SetCardProgress(card=card, owned_quantity=owned_quantities.get(card.id, 0))
         for card in cards
@@ -171,6 +179,43 @@ def ensure_set_checklist(set_id: str) -> int:
 
 def _owned_quantities(set_id: str) -> dict[int, int]:
     return _owned_quantities_by_set([set_id]).get(set_id, {})
+
+
+def _cached_card_counts_by_set(set_ids: Iterable[str]) -> dict[str, int]:
+    rows = (
+        CardMetadata.objects.filter(set_id__in=set_ids)
+        .values("set_id")
+        .annotate(cached_cards=Count("id"))
+    )
+    return {row["set_id"]: row["cached_cards"] for row in rows}
+
+
+def _representative_cards_by_set(set_ids: Iterable[str]) -> dict[str, CardMetadata]:
+    representative_ids = (
+        CardMetadata.objects.filter(set_id__in=set_ids)
+        .values("set_id")
+        .annotate(card_id=Min("id"))
+        .values_list("card_id", flat=True)
+    )
+    cards = CardMetadata.objects.filter(id__in=representative_ids).only(
+        "set_id",
+        "set_name",
+        "set_series",
+        "release_date",
+    )
+    return {card.set_id: card for card in cards}
+
+
+def _owned_totals_by_set(set_ids: Iterable[str]) -> dict[str, tuple[int, int]]:
+    rows = (
+        OwnedCard.objects.filter(card__set_id__in=set_ids)
+        .values("card__set_id")
+        .annotate(owned_cards=Count("card_id", distinct=True), owned_quantity=Sum("quantity"))
+    )
+    return {
+        row["card__set_id"]: (row["owned_cards"] or 0, row["owned_quantity"] or 0)
+        for row in rows
+    }
 
 
 def _owned_quantities_by_set(set_ids: Iterable[str]) -> dict[str, dict[int, int]]:

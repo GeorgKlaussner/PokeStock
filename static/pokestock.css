@@ -39,6 +39,10 @@ body.authenticated {
   min-height: 100dvh;
 }
 
+body.is-navigating {
+  cursor: progress;
+}
+
 a {
   color: var(--accent-strong);
   text-decoration: none;
@@ -324,6 +328,10 @@ button:hover,
 input[type="submit"]:hover {
   filter: brightness(0.97);
   text-decoration: none;
+}
+
+.is-loading {
+  opacity: 0.72;
 }
 
 .grid {
