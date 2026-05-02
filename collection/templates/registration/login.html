@@ -1,0 +1,31 @@
+{% extends "collection/base.html" %}
+
+{% block title %}Log in - PokeStock{% endblock %}
+
+{% block content %}
+  <section class="card login-card">
+    <div class="page-head">
+      <div>
+        <h1>Log in</h1>
+        <p class="subtle">Use the local admin account created during setup.</p>
+      </div>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="grid">
+        <div class="field">
+          {{ form.username.label_tag }}
+          {{ form.username }}
+          {{ form.username.errors }}
+        </div>
+        <div class="field">
+          {{ form.password.label_tag }}
+          {{ form.password }}
+          {{ form.password.errors }}
+        </div>
+        <button type="submit">Log in</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "collection/base.html" %}
+{% load collection_extras %}
+
+{% block title %}Add Card - PokeStock{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>Add card</h1>
+      <p class="subtle">Search directly, or browse all synced PokemonTCG sets and add from a set checklist.</p>
+    </div>
+    <a class="button secondary" href="{% url 'camera_add' %}">Use camera</a>
+  </div>
+
+  <section class="card">
+    <div class="section-heading">
+      <div>
+        <h2>Browse sets</h2>
+        <p class="subtle">{{ set_count }} synced sets. Refresh the catalog to load the latest PokemonTCG set list.</p>
+      </div>
+      <form method="post" action="{% url 'refresh_set_catalog' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="secondary" type="submit">Refresh set catalog</button>
+      </form>
+    </div>
+
+    <form class="set-search" method="get">
+      <label for="set_q">Filter sets</label>
+      <div class="set-search-row">
+        <input id="set_q" type="search" name="set_q" value="{{ set_query }}" placeholder="151, Base, Scarlet & Violet">
+        <button type="submit">Filter</button>
+      </div>
+    </form>
+
+    <div class="set-list section-gap">
+      {% for set in sets %}
+        <a class="set-list-item" href="{% url 'add_set_cards' set.external_id %}">
+          {% if set.logo_url %}
+            <img src="{{ set.logo_url }}" alt="{{ set.name }}">
+          {% endif %}
+          <span>
+            <strong>{{ set.name }}</strong>
+            <span class="subtle">{{ set.series }} - {{ set.total }} cards</span>
+          </span>
+        </a>
+      {% empty %}
+        <p class="subtle">No synced sets found. Refresh the set catalog to load all available sets.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <form class="card" method="get">
+    <h2>Search cards</h2>
+    {{ form.non_field_errors }}
+    <div class="form-grid">
+      {% for field in form %}
+        <div class="field">
+          {{ field.label_tag }}
+          {{ field }}
+          {{ field.errors }}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="actions form-actions">
+      <button type="submit">Search</button>
+    </div>
+  </form>
+
+  {% if searched %}
+    <section class="section-gap">
+      <div class="candidate-grid">
+        {% for card in candidates %}
+          <article class="card candidate">
+            {% if card.image_small_url %}
+              <img src="{{ card.image_small_url }}" alt="{{ card.name }}">
+            {% endif %}
+            <div>
+              <h2>{{ card.name }}</h2>
+              <p class="subtle">{{ card.set_name }} #{{ card.card_number }}{% if card.rarity %} - {{ card.rarity }}{% endif %}</p>
+              <p>{{ card.price_value|money:card.price_currency }}</p>
+            </div>
+            <a class="button" href="{% url 'add_owned_card' card.external_id %}">Select</a>
+          </article>
+        {% empty %}
+          <p class="subtle">No matches found.</p>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

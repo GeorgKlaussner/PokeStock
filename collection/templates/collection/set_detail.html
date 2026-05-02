@@ -1,0 +1,82 @@
+{% extends "collection/base.html" %}
+
+{% block title %}{{ progress.set_name }} - PokeStock{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>{{ progress.set_name }}</h1>
+      <p class="subtle">{{ progress.owned_cards }} of {{ progress.total_cards }} cards owned - {{ progress.completion_percent }}% complete</p>
+    </div>
+    <div class="actions">
+      <form method="post" action="{% url 'refresh_set' progress.set_id %}">
+        {% csrf_token %}
+        <button class="secondary" type="submit">Refresh checklist</button>
+      </form>
+    </div>
+  </div>
+
+  <section class="grid stats-grid">
+    <article class="card stat">
+      <p class="stat-label">Owned cards</p>
+      <p class="stat-value">{{ progress.owned_cards }}</p>
+    </article>
+    <article class="card stat">
+      <p class="stat-label">Missing cards</p>
+      <p class="stat-value">{{ progress.missing_cards }}</p>
+    </article>
+    <article class="card stat">
+      <p class="stat-label">Completion</p>
+      <p class="stat-value">{{ progress.completion_percent }}%</p>
+    </article>
+    <article class="card stat">
+      <p class="stat-label">Total copies</p>
+      <p class="stat-value">{{ progress.owned_quantity }}</p>
+    </article>
+  </section>
+
+  {% if not progress.checklist_complete %}
+    <section class="message warning section-gap">
+      Checklist is incomplete: {{ progress.cached_cards }} of {{ progress.total_cards }} cards are cached.
+    </section>
+  {% endif %}
+
+  {% include "collection/includes/pagination.html" %}
+
+  <section class="set-card-grid section-gap">
+    {% for item in page_obj %}
+      <details class="set-card {% if not item.is_owned %}is-missing{% endif %}">
+        <summary class="set-card-summary">
+          <div class="set-card-image-wrap">
+            {% if item.card.image_small_url %}
+              <img src="{{ item.card.image_small_url }}" alt="{{ item.card.name }}">
+            {% else %}
+              <div class="set-card-placeholder">{{ item.card.card_number }}</div>
+            {% endif %}
+            {% if item.is_owned %}
+              <span class="owned-badge">{{ item.owned_quantity }}</span>
+            {% endif %}
+          </div>
+          <span class="set-card-title">{{ item.card.name }}</span>
+          <span class="subtle">#{{ item.card.card_number }}{% if item.card.rarity %} - {{ item.card.rarity }}{% endif %}</span>
+        </summary>
+        <div class="set-card-body">
+          <div class="actions">
+            <a class="button secondary" href="{% url 'card_detail' item.card.external_id %}">Details</a>
+            <form method="post" action="{% url 'quick_add_card' item.card.external_id %}">
+              {% csrf_token %}
+              <button type="submit">Quick add</button>
+            </form>
+            <a class="button secondary" href="{% url 'add_owned_card' item.card.external_id %}">Edit</a>
+          </div>
+        </div>
+      </details>
+    {% empty %}
+      <section class="card">
+        <p class="subtle">No cards cached for this set.</p>
+      </section>
+    {% endfor %}
+  </section>
+
+  {% include "collection/includes/pagination.html" %}
+{% endblock %}

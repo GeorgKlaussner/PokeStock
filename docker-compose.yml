@@ -1,0 +1,61 @@
+services:
+  web:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
+      SQLITE_PATH: /app/pokestock.sqlite3
+      REDIS_URL: redis://redis:6379/0
+      OCR_SERVICE_URL: http://ocr:8080
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py ensureadmin &&
+             python manage.py collectstatic --noinput &&
+             gunicorn pokestock_project.wsgi:application --bind 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./media:/app/media
+    depends_on:
+      - redis
+      - ocr
+
+  worker:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SQLITE_PATH: /app/pokestock.sqlite3
+      REDIS_URL: redis://redis:6379/0
+      OCR_SERVICE_URL: http://ocr:8080
+    command: celery -A pokestock_project worker --loglevel=info --beat
+    volumes:
+      - .:/app
+      - ./media:/app/media
+    depends_on:
+      - redis
+      - ocr
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  ocr:
+    build:
+      context: .
+      dockerfile: ocr_service/Dockerfile
+    ports:
+      - "8080:8080"
+
+volumes:
+  redis-data:
+

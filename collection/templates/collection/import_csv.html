@@ -1,0 +1,59 @@
+{% extends "collection/base.html" %}
+
+{% block title %}Import CSV - PokeStock{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>Import CSV</h1>
+      <p class="subtle">Rows match by card_id first, then exact name, set_name, and card_number.</p>
+    </div>
+    <a class="button secondary" href="{% url 'export_csv' %}">Export CSV</a>
+  </div>
+
+  <form class="card" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="field">
+      {{ form.csv_file.label_tag }}
+      {{ form.csv_file }}
+      {{ form.csv_file.errors }}
+    </div>
+    <div class="actions form-actions">
+      <button type="submit">Import</button>
+    </div>
+  </form>
+
+  {% if result %}
+    <section class="card section-gap">
+      <h2>Import result</h2>
+      <p>Created {{ result.created_count }} rows.</p>
+      {% if result.issues %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Row</th>
+                <th>Issue</th>
+                <th>Name</th>
+                <th>Set</th>
+                <th>Number</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for issue in result.issues %}
+                <tr>
+                  <td>{{ issue.row_number }}</td>
+                  <td>{{ issue.message }}</td>
+                  <td>{{ issue.row.name }}</td>
+                  <td>{{ issue.row.set_name }}</td>
+                  <td>{{ issue.row.card_number }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

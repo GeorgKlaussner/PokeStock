@@ -1,0 +1,46 @@
+{% extends "collection/base.html" %}
+
+{% block title %}Sets - PokeStock{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>Sets</h1>
+      <p class="subtle">Explore PokemonTCG set progress using official set totals.</p>
+    </div>
+    <div class="actions">
+      <a class="button secondary" href="{% url 'add_search' %}">Find cards</a>
+      <form method="post" action="{% url 'refresh_set_catalog' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="secondary" type="submit">Refresh set catalog</button>
+      </form>
+    </div>
+  </div>
+
+  <section class="set-grid">
+    {% for set in sets %}
+      <article class="card set-summary">
+        <div>
+          <h2>{{ set.set_name }}</h2>
+          {% if set.set_series %}<p class="subtle">{{ set.set_series }}</p>{% endif %}
+        </div>
+        <progress class="progress-meter" value="{{ set.completion_percent }}" max="100">{{ set.completion_percent }}%</progress>
+        <div class="set-summary-stats">
+          <span>{{ set.owned_cards }} / {{ set.total_cards }} owned</span>
+          <span>{{ set.completion_percent }}%</span>
+        </div>
+        <p class="subtle">
+          {{ set.missing_cards }} missing - {{ set.owned_quantity }} total copies
+          {% if not set.checklist_complete %}<br>{{ set.cached_cards }} of {{ set.total_cards }} checklist cards cached{% endif %}
+        </p>
+        <a class="button" href="{% url 'set_detail' set.set_id %}">Open set</a>
+      </article>
+    {% empty %}
+      <section class="card">
+        <h2>No owned sets yet</h2>
+        <p class="subtle">Add a card to start tracking progress for that set.</p>
+      </section>
+    {% endfor %}
+  </section>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "collection/base.html" %}
+{% load collection_extras %}
+
+{% block title %}Dashboard - PokeStock{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>Dashboard</h1>
+      <p class="subtle">Collection value uses available Cardmarket EUR fields from cached PokemonTCG card data.</p>
+    </div>
+    <div class="actions">
+      <a class="button" href="{% url 'add_search' %}">Add card</a>
+      <form method="post" action="{% url 'refresh_collection' %}">
+        {% csrf_token %}
+        <button class="secondary" type="submit">Refresh prices</button>
+      </form>
+    </div>
+  </div>
+
+  <section class="grid stats-grid">
+    <article class="card stat">
+      <p class="stat-label">Total value</p>
+      <p class="stat-value">{{ summary.total_value|money:"EUR" }}</p>
+    </article>
+    <article class="card stat">
+      <p class="stat-label">Owned cards</p>
+      <p class="stat-value">{{ summary.total_quantity }}</p>
+    </article>
+    <article class="card stat">
+      <p class="stat-label">Rows</p>
+      <p class="stat-value">{{ summary.owned_rows }}</p>
+    </article>
+    <article class="card stat">
+      <p class="stat-label">Missing prices</p>
+      <p class="stat-value">{{ summary.missing_price_count }}</p>
+    </article>
+    <article class="card stat">
+      <p class="stat-label">Stale prices</p>
+      <p class="stat-value">{{ summary.stale_price_count }}</p>
+    </article>
+  </section>
+
+  <section class="grid two-column section-gap">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Set</th>
+            <th>Owned</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in summary.value_by_set %}
+            <tr>
+              <td>{{ item.set_name }}</td>
+              <td>{{ item.owned_count }}</td>
+              <td>{{ item.value|money:"EUR" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3">No priced cards yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <aside class="card">
+      <h2>Recently added</h2>
+      <div class="grid">
+        {% for owned in recent_owned %}
+          <div>
+            <a href="{% url 'card_detail' owned.card.external_id %}">{{ owned.card.name }}</a>
+            <div class="subtle">{{ owned.quantity }}x {{ owned.get_variant_display }} - {{ owned.get_condition_display }}</div>
+          </div>
+        {% empty %}
+          <p class="subtle">No cards added yet.</p>
+        {% endfor %}
+      </div>
+    </aside>
+  </section>
+{% endblock %}

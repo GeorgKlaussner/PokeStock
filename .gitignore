@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+pokestock.sqlite3
+pokestock.sqlite3-*
+media/
+staticfiles/
+celerybeat-schedule*
+

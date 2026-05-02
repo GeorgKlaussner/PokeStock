@@ -1,0 +1,74 @@
+{% extends "collection/base.html" %}
+{% load collection_extras %}
+
+{% block title %}{{ card.name }} - PokeStock{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>{{ card.name }}</h1>
+      <p class="subtle">{{ card.set_name }}{% if card.card_number %} #{{ card.card_number }}{% endif %}{% if card.rarity %} - {{ card.rarity }}{% endif %}</p>
+    </div>
+    <div class="actions">
+      <a class="button" href="{% url 'add_owned_card' card.external_id %}">Add copy</a>
+      <form method="post" action="{% url 'refresh_card' card.external_id %}">
+        {% csrf_token %}
+        <button class="secondary" type="submit">Refresh price</button>
+      </form>
+    </div>
+  </div>
+
+  <section class="detail-layout">
+    <div>
+      {% if card.image_large_url %}
+        <img class="detail-image" src="{{ card.image_large_url }}" alt="{{ card.name }}">
+      {% elif card.image_small_url %}
+        <img class="detail-image" src="{{ card.image_small_url }}" alt="{{ card.name }}">
+      {% endif %}
+    </div>
+    <div class="grid">
+      <section class="card">
+        <h2>Current price</h2>
+        <p class="stat-value">{{ card.price_value|money:card.price_currency }}</p>
+        <p class="subtle">
+          {% if card.price_source_field %}{{ card.price_source_field }}{% else %}No source field{% endif %}
+          {% if card.price_upstream_updated_at %} - {{ card.price_upstream_updated_at }}{% endif %}
+        </p>
+        {% if card.cardmarket_url %}
+          <a href="{{ card.cardmarket_url }}" rel="noreferrer" target="_blank">Open Cardmarket</a>
+        {% endif %}
+        {% if card.last_sync_error %}
+          <p class="subtle">Last sync error: {{ card.last_sync_error }}</p>
+        {% endif %}
+      </section>
+
+      <section class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Variant</th>
+              <th>Condition</th>
+              <th>Language</th>
+              <th>Qty</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for owned in card.owned_cards.all %}
+              <tr>
+                <td>{{ owned.get_variant_display }}{% if owned.variant_custom %}<div class="subtle">{{ owned.variant_custom }}</div>{% endif %}</td>
+                <td>{{ owned.get_condition_display }}</td>
+                <td>{{ owned.language }}</td>
+                <td>{{ owned.quantity }}</td>
+                <td>{{ owned.row_value|money:card.price_currency }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5">No owned copies yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </section>
+{% endblock %}
+

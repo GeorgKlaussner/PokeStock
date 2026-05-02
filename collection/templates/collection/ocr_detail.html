@@ -1,0 +1,49 @@
+{% extends "collection/base.html" %}
+
+{% block title %}OCR Job - PokeStock{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>Photo result</h1>
+      <p class="subtle">Status: <span class="badge">{{ job.get_status_display }}</span></p>
+    </div>
+    <a class="button secondary" href="{% url 'ocr_upload' %}">New photo</a>
+  </div>
+
+  {% if job.status == "pending" or job.status == "processing" %}
+    <section class="card">
+      <p>Processing is still running. Refresh this page shortly.</p>
+    </section>
+  {% elif job.status == "failed" %}
+    <section class="card">
+      <p class="subtle">{{ job.error }}</p>
+    </section>
+  {% else %}
+    <section class="grid">
+      {% if job.raw_text %}
+        <div class="card">
+          <h2>OCR text</h2>
+          <pre class="raw-text">{{ job.raw_text }}</pre>
+        </div>
+      {% endif %}
+      <div class="candidate-grid">
+        {% for card in candidates %}
+          <article class="card candidate">
+            {% if card.image_small_url %}
+              <img src="{{ card.image_small_url }}" alt="{{ card.name }}">
+            {% endif %}
+            <div>
+              <h2>{{ card.name }}</h2>
+              <p class="subtle">{{ card.set_name }} #{{ card.card_number }}{% if card.rarity %} - {{ card.rarity }}{% endif %}</p>
+            </div>
+            <a class="button" href="{% url 'add_owned_card' card.external_id %}">Select</a>
+          </article>
+        {% empty %}
+          <p class="subtle">No candidates found.</p>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}
+

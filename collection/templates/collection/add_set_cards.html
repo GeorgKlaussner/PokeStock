@@ -1,0 +1,87 @@
+{% extends "collection/base.html" %}
+{% load collection_extras %}
+
+{% block title %}Add From {{ set_metadata.name }} - PokeStock{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>{{ set_metadata.name }}</h1>
+      <p class="subtle">Choose a card from this full set checklist.</p>
+    </div>
+    <div class="actions">
+      <a class="button secondary" href="{% url 'add_search' %}">All sets</a>
+      <form method="post" action="{% url 'refresh_set' set_metadata.external_id %}">
+        {% csrf_token %}
+        <button class="secondary" type="submit">Refresh checklist</button>
+      </form>
+    </div>
+  </div>
+
+  {% if progress %}
+    <section class="grid stats-grid">
+      <article class="card stat">
+        <p class="stat-label">Owned</p>
+        <p class="stat-value">{{ progress.owned_cards }}</p>
+      </article>
+      <article class="card stat">
+        <p class="stat-label">Missing</p>
+        <p class="stat-value">{{ progress.missing_cards }}</p>
+      </article>
+      <article class="card stat">
+        <p class="stat-label">Total</p>
+        <p class="stat-value">{{ progress.total_cards }}</p>
+      </article>
+      <article class="card stat">
+        <p class="stat-label">Complete</p>
+        <p class="stat-value">{{ progress.completion_percent }}%</p>
+      </article>
+    </section>
+  {% endif %}
+
+  {% if progress and not progress.checklist_complete %}
+    <section class="message warning section-gap">
+      Checklist is incomplete: {{ progress.cached_cards }} of {{ progress.total_cards }} cards are cached.
+    </section>
+  {% endif %}
+
+  {% include "collection/includes/pagination.html" %}
+
+  <section class="set-card-grid section-gap">
+    {% for item in page_obj %}
+      <details class="set-card {% if not item.is_owned %}is-missing{% endif %}">
+        <summary class="set-card-summary">
+          <div class="set-card-image-wrap">
+            {% if item.card.image_small_url %}
+              <img src="{{ item.card.image_small_url }}" alt="{{ item.card.name }}">
+            {% else %}
+              <div class="set-card-placeholder">{{ item.card.card_number }}</div>
+            {% endif %}
+            {% if item.is_owned %}
+              <span class="owned-badge">{{ item.owned_quantity }}</span>
+            {% endif %}
+          </div>
+          <span class="set-card-title">{{ item.card.name }}</span>
+          <span class="subtle">#{{ item.card.card_number }}{% if item.card.rarity %} - {{ item.card.rarity }}{% endif %}</span>
+        </summary>
+        <div class="set-card-body">
+          <p>{{ item.card.price_value|money:item.card.price_currency }}</p>
+          <div class="actions">
+            <form method="post" action="{% url 'quick_add_card' item.card.external_id %}">
+              {% csrf_token %}
+              <button type="submit">Quick add</button>
+            </form>
+            <a class="button secondary" href="{% url 'add_owned_card' item.card.external_id %}">Edit</a>
+            <a class="button secondary" href="{% url 'card_detail' item.card.external_id %}">Details</a>
+          </div>
+        </div>
+      </details>
+    {% empty %}
+      <section class="card">
+        <p class="subtle">No cards are cached for this set yet. Refresh the checklist.</p>
+      </section>
+    {% endfor %}
+  </section>
+
+  {% include "collection/includes/pagination.html" %}
+{% endblock %}

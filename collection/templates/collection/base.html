@@ -1,0 +1,128 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>{% block title %}PokeStock{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'pokestock.css' %}">
+</head>
+<body class="{% if request.user.is_authenticated %}authenticated{% else %}guest{% endif %}">
+  {% with active=request.resolver_match.url_name %}
+    {% if request.user.is_authenticated %}
+      <div class="app-shell">
+        <aside class="sidebar">
+          <div>
+            <a class="brand" href="{% url 'dashboard' %}">
+              <span class="brand-mark">PS</span>
+              <span>PokeStock</span>
+            </a>
+            <nav class="side-nav" aria-label="Primary">
+              <a class="nav-link {% if active == 'dashboard' %}is-active{% endif %}" href="{% url 'dashboard' %}">
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3z"></path><path d="M13 21h8V11h-8z"></path><path d="M13 3h8v6h-8z"></path><path d="M3 21h8v-6H3z"></path></svg></span>
+                <span>Dashboard</span>
+              </a>
+              <a class="nav-link {% if active == 'sets_index' or active == 'set_detail' %}is-active{% endif %}" href="{% url 'sets_index' %}">
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4z"></path><path d="M14 4h6v6h-6z"></path><path d="M4 14h6v6H4z"></path><path d="M14 14h6v6h-6z"></path></svg></span>
+                <span>Sets</span>
+              </a>
+              <a class="nav-link {% if active == 'collection_list' or active == 'card_detail' %}is-active{% endif %}" href="{% url 'collection_list' %}">
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 2h12a2 2 0 0 1 2 2v16l-8-3-8 3V4a2 2 0 0 1 2-2z"></path></svg></span>
+                <span>Collection</span>
+              </a>
+              <a class="nav-link {% if active == 'camera_add' %}is-active{% endif %}" href="{% url 'camera_add' %}">
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></span>
+                <span>Camera</span>
+              </a>
+              <a class="nav-link {% if active == 'add_search' or active == 'add_owned_card' %}is-active{% endif %}" href="{% url 'add_search' %}">
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg></span>
+                <span>Add card</span>
+              </a>
+              <a class="nav-link {% if active == 'import_csv' %}is-active{% endif %}" href="{% url 'import_csv' %}">
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg></span>
+                <span>Import CSV</span>
+              </a>
+              <a class="nav-link" href="{% url 'export_csv' %}">
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21V9"></path><path d="m7 14 5-5 5 5"></path><path d="M5 3h14"></path></svg></span>
+                <span>Export CSV</span>
+              </a>
+            </nav>
+          </div>
+          <div class="sidebar-footer">
+            <p class="user-label">{{ request.user.username }}</p>
+            <form class="logout-form" method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+              <button class="logout-button" type="submit">
+                <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path><path d="M21 3v18"></path></svg></span>
+                <span>Log out</span>
+              </button>
+            </form>
+          </div>
+        </aside>
+
+        <div class="main-shell">
+          <header class="mobile-topbar">
+            <a class="brand" href="{% url 'dashboard' %}">
+              <span class="brand-mark">PS</span>
+              <span>PokeStock</span>
+            </a>
+            <form class="logout-form" method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+              <button class="button secondary" type="submit">Log out</button>
+            </form>
+          </header>
+    {% else %}
+      <header class="guest-header">
+        <div class="guest-header-inner">
+          <a class="brand" href="{% url 'dashboard' %}">
+            <span class="brand-mark">PS</span>
+            <span>PokeStock</span>
+          </a>
+        </div>
+      </header>
+    {% endif %}
+
+    <main class="container">
+      {% if messages %}
+        <div class="messages">
+          {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+
+    {% if request.user.is_authenticated %}
+        </div>
+
+        <nav class="mobile-tabbar" aria-label="Mobile primary">
+          <a class="mobile-tab-link {% if active == 'dashboard' %}is-active{% endif %}" href="{% url 'dashboard' %}">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3z"></path><path d="M13 21h8V11h-8z"></path><path d="M13 3h8v6h-8z"></path><path d="M3 21h8v-6H3z"></path></svg></span>
+            <span>Home</span>
+          </a>
+          <a class="mobile-tab-link {% if active == 'sets_index' or active == 'set_detail' %}is-active{% endif %}" href="{% url 'sets_index' %}">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4z"></path><path d="M14 4h6v6h-6z"></path><path d="M4 14h6v6H4z"></path><path d="M14 14h6v6h-6z"></path></svg></span>
+            <span>Sets</span>
+          </a>
+          <a class="mobile-tab-link {% if active == 'collection_list' or active == 'card_detail' %}is-active{% endif %}" href="{% url 'collection_list' %}">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 2h12a2 2 0 0 1 2 2v16l-8-3-8 3V4a2 2 0 0 1 2-2z"></path></svg></span>
+            <span>Cards</span>
+          </a>
+          <a class="mobile-tab-link {% if active == 'camera_add' %}is-active{% endif %}" href="{% url 'camera_add' %}">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></span>
+            <span>Camera</span>
+          </a>
+          <a class="mobile-tab-link {% if active == 'add_search' or active == 'add_owned_card' %}is-active{% endif %}" href="{% url 'add_search' %}">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg></span>
+            <span>Add</span>
+          </a>
+        </nav>
+      </div>
+    {% endif %}
+  {% endwith %}
+</body>
+</html>

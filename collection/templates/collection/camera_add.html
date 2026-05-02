@@ -1,0 +1,45 @@
+{% extends "collection/base.html" %}
+{% load static %}
+
+{% block title %}Camera Add - PokeStock{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>Camera add</h1>
+      <p class="subtle">Capture a card on iOS, read it in the browser, and send only text to PokeStock.</p>
+    </div>
+    <a class="button secondary" href="{% url 'add_search' %}">Manual search</a>
+  </div>
+
+  <section
+    class="card camera-panel"
+    data-camera-add
+    data-candidates-url="{% url 'camera_candidates' %}"
+  >
+    <form class="grid" id="camera-form">
+      {% csrf_token %}
+      <div class="field">
+        <label for="camera-input">Card photo</label>
+        <input id="camera-input" type="file" accept="image/*" capture="environment">
+      </div>
+      <img class="camera-preview" id="camera-preview" alt="" hidden>
+      <div class="actions">
+        <button id="camera-process" type="button" disabled>Find card</button>
+      </div>
+    </form>
+
+    <div class="camera-status subtle" id="camera-status">Choose a photo to start.</div>
+    <pre class="raw-text camera-text" id="camera-text" hidden></pre>
+  </section>
+
+  <section class="section-gap">
+    <div class="candidate-grid" id="camera-candidates"></div>
+    <p class="subtle" id="camera-empty" hidden>No likely matches found.</p>
+    <a class="button secondary" id="camera-manual-link" href="{% url 'add_search' %}" hidden>Search manually</a>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="{% static 'camera_add.js' %}"></script>
+{% endblock %}
+

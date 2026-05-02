@@ -1,0 +1,38 @@
+{% extends "collection/base.html" %}
+{% load collection_extras %}
+
+{% block title %}Add {{ card.name }} - PokeStock{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>Add {{ card.name }}</h1>
+      <p class="subtle">{{ card.set_name }} #{{ card.card_number }} - {{ card.price_value|money:card.price_currency }}</p>
+    </div>
+    <a class="button secondary" href="{% url 'add_search' %}">Back to search</a>
+  </div>
+
+  <section class="detail-layout">
+    <div>
+      {% if card.image_small_url %}
+        <img class="detail-image" src="{{ card.image_small_url }}" alt="{{ card.name }}">
+      {% endif %}
+    </div>
+    <form class="card" method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="form-grid">
+        {% for field in form %}
+          <div class="field">
+            {{ field.label_tag }}
+            {{ field }}
+            {{ field.errors }}
+          </div>
+        {% endfor %}
+      </div>
+      <div class="actions form-actions">
+        <button type="submit">Add to collection</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}
