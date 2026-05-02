@@ -19,6 +19,8 @@ The app is optimized for private home-server use, not public SaaS multi-tenancy.
   - `redis`: broker/cache.
   - `ocr`: local OCR service for the legacy upload flow.
 - Only `web` should publish a host port. Redis and OCR must remain reachable only through the internal Docker network.
+- The app Dockerfile should not declare `EXPOSE 8000`; Compose is the source of truth for publishing only the `web` service.
+- In the current self-hosted v1 stack, Django serves static assets in `DEBUG` mode via `staticfiles_urlpatterns()`. There is no Nginx or WhiteNoise layer yet.
 - Do not add Postgres for v1.
 - Do not commit secrets. Use `.env.example` for configuration shape.
 - Require one local admin login. No public registration or multi-user tenancy in v1.
