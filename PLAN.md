@@ -18,6 +18,7 @@ The app is optimized for private home-server use, not public SaaS multi-tenancy.
   - `worker`: Celery worker/beat.
   - `redis`: broker/cache.
   - `ocr`: local OCR service for the legacy upload flow.
+- Only `web` should publish a host port. Redis and OCR must remain reachable only through the internal Docker network.
 - Do not add Postgres for v1.
 - Do not commit secrets. Use `.env.example` for configuration shape.
 - Require one local admin login. No public registration or multi-user tenancy in v1.

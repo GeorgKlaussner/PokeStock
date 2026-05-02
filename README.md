@@ -29,6 +29,8 @@ The SQLite database is stored at `./pokestock.sqlite3` in the project base folde
 - `redis`: Celery broker/result backend.
 - `ocr`: Local Tesseract HTTP service used by photo-assisted adding.
 
+Only the `web` service publishes a host port (`8000`). Redis and OCR are reachable only inside the Docker network.
+
 ## Camera Add
 
 The primary camera flow is browser-based for iOS Safari and mobile browsers. The card image is read by Tesseract.js in the browser, and only extracted text is sent to Django for candidate matching. Captured photos are not uploaded or stored by this flow.

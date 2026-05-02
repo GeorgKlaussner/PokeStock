@@ -18,6 +18,9 @@ services:
              gunicorn pokestock_project.wsgi:application --bind 0.0.0.0:8000"
     ports:
       - "8000:8000"
+    networks:
+      - pokestock-egress
+      - pokestock-internal
     volumes:
       - .:/app
       - ./media:/app/media
@@ -35,6 +38,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       OCR_SERVICE_URL: http://ocr:8080
     command: celery -A pokestock_project worker --loglevel=info --beat
+    networks:
+      - pokestock-egress
+      - pokestock-internal
     volumes:
       - .:/app
       - ./media:/app/media
@@ -44,8 +50,8 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    networks:
+      - pokestock-internal
     volumes:
       - redis-data:/data
 
@@ -53,9 +59,13 @@ services:
     build:
       context: .
       dockerfile: ocr_service/Dockerfile
-    ports:
-      - "8080:8080"
+    networks:
+      - pokestock-internal
 
 volumes:
   redis-data:
 
+networks:
+  pokestock-egress:
+  pokestock-internal:
+    internal: true
