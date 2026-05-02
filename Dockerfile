@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["gunicorn", "pokestock_project.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["sh", "-c", "gunicorn pokestock_project.wsgi:application --bind 0.0.0.0:8000 --worker-class gthread --workers \"${WEB_CONCURRENCY:-2}\" --threads \"${GUNICORN_THREADS:-4}\" --timeout \"${GUNICORN_TIMEOUT:-60}\" --access-logfile - --error-logfile - --access-logformat '%(h)s %(r)s %(s)s %(M)sms'"]

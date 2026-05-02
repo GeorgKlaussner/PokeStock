@@ -16,11 +16,22 @@ services:
       REDIS_URL: redis://redis:6379/0
       OCR_SERVICE_URL: http://ocr:8080
       OCR_LANGUAGES: ${OCR_LANGUAGES:-eng+deu+spa+jpn}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-4}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-60}
     command: >
       sh -c "python manage.py migrate &&
              python manage.py ensureadmin &&
              python manage.py collectstatic --noinput &&
-             gunicorn pokestock_project.wsgi:application --bind 0.0.0.0:8000"
+             gunicorn pokestock_project.wsgi:application
+             --bind 0.0.0.0:8000
+             --worker-class gthread
+             --workers ${WEB_CONCURRENCY:-2}
+             --threads ${GUNICORN_THREADS:-4}
+             --timeout ${GUNICORN_TIMEOUT:-60}
+             --access-logfile -
+             --error-logfile -
+             --access-logformat '%(h)s %(r)s %(s)s %(M)sms'"
     ports:
       - "8000:8000"
     networks:
