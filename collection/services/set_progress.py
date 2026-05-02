@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 
@@ -51,19 +53,54 @@ def cached_set_progresses(*, owned_only: bool = False) -> list[SetProgress]:
             .distinct()
         )
         set_ids = catalog_ids | card_ids
-    progresses = [progress for set_id in set_ids if (progress := set_progress(set_id))]
+    progresses = list(_build_set_progresses(set_ids).values())
     progresses.sort(key=lambda item: item.set_name)
     progresses.sort(key=lambda item: item.release_date or date.min, reverse=True)
     return progresses
 
 
 def set_progress(set_id: str) -> SetProgress | None:
-    cards = list(CardMetadata.objects.filter(set_id=set_id))
-    set_metadata = SetMetadata.objects.filter(external_id=set_id).first()
+    return _build_set_progresses([set_id]).get(set_id)
+
+
+def _build_set_progresses(set_ids: Iterable[str]) -> dict[str, SetProgress]:
+    normalized_set_ids = list(dict.fromkeys(set_id for set_id in set_ids if set_id))
+    if not normalized_set_ids:
+        return {}
+
+    set_metadatas = {
+        item.external_id: item
+        for item in SetMetadata.objects.filter(external_id__in=normalized_set_ids)
+    }
+    cards_by_set: dict[str, list[CardMetadata]] = defaultdict(list)
+    for card in CardMetadata.objects.filter(set_id__in=normalized_set_ids):
+        cards_by_set[card.set_id].append(card)
+    owned_quantities_by_set = _owned_quantities_by_set(normalized_set_ids)
+
+    progresses: dict[str, SetProgress] = {}
+    for set_id in normalized_set_ids:
+        cards = cards_by_set.get(set_id, [])
+        set_metadata = set_metadatas.get(set_id)
+        progress = _build_set_progress(
+            set_id,
+            cards,
+            set_metadata,
+            owned_quantities_by_set.get(set_id, {}),
+        )
+        if progress is not None:
+            progresses[set_id] = progress
+    return progresses
+
+
+def _build_set_progress(
+    set_id: str,
+    cards: list[CardMetadata],
+    set_metadata: SetMetadata | None,
+    owned_quantities: dict[int, int],
+) -> SetProgress | None:
     if not cards and set_metadata is None:
         return None
 
-    owned_quantities = _owned_quantities(set_id)
     owned_card_count = sum(1 for card in cards if owned_quantities.get(card.id, 0) > 0)
     owned_quantity = sum(owned_quantities.values())
     cached_cards = len(cards)
@@ -74,8 +111,11 @@ def set_progress(set_id: str) -> SetProgress | None:
     representative = cards[0] if cards else None
     return SetProgress(
         set_id=set_id,
-        set_name=(set_metadata.name if set_metadata else "") or (representative.set_name if representative else "") or set_id,
-        set_series=(set_metadata.series if set_metadata else "") or (representative.set_series if representative else ""),
+        set_name=(set_metadata.name if set_metadata else "")
+        or (representative.set_name if representative else "")
+        or set_id,
+        set_series=(set_metadata.series if set_metadata else "")
+        or (representative.set_series if representative else ""),
         total_cards=total_cards,
         owned_cards=owned_card_count,
         owned_quantity=owned_quantity,
@@ -83,7 +123,9 @@ def set_progress(set_id: str) -> SetProgress | None:
         completion_percent=completion_percent,
         cached_cards=cached_cards,
         checklist_complete=bool(set_metadata and catalog_total and cached_cards >= catalog_total),
-        release_date=set_metadata.release_date if set_metadata else (representative.release_date if representative else None),
+        release_date=set_metadata.release_date
+        if set_metadata
+        else (representative.release_date if representative else None),
         logo_url=set_metadata.logo_url if set_metadata else "",
     )
 
@@ -128,12 +170,19 @@ def ensure_set_checklist(set_id: str) -> int:
 
 
 def _owned_quantities(set_id: str) -> dict[int, int]:
+    return _owned_quantities_by_set([set_id]).get(set_id, {})
+
+
+def _owned_quantities_by_set(set_ids: Iterable[str]) -> dict[str, dict[int, int]]:
     rows = (
-        OwnedCard.objects.filter(card__set_id=set_id)
-        .values("card_id")
+        OwnedCard.objects.filter(card__set_id__in=set_ids)
+        .values("card__set_id", "card_id")
         .annotate(quantity=Sum("quantity"))
     )
-    return {row["card_id"]: row["quantity"] or 0 for row in rows}
+    quantities: dict[str, dict[int, int]] = defaultdict(dict)
+    for row in rows:
+        quantities[row["card__set_id"]][row["card_id"]] = row["quantity"] or 0
+    return quantities
 
 
 def _card_number_sort_key(value: str) -> tuple[int, int | str]:

@@ -26,11 +26,13 @@ class OCRClient:
         self.service_url = (service_url or settings.OCR_SERVICE_URL).rstrip("/")
 
     def extract_text(self, image_path: str) -> str:
+        return self.extract_text_bytes(Path(image_path).read_bytes())
+
+    def extract_text_bytes(self, image_bytes: bytes) -> str:
         url = f"{self.service_url}/ocr"
-        data = Path(image_path).read_bytes()
         request = urllib.request.Request(
             url,
-            data=data,
+            data=image_bytes,
             method="POST",
             headers={"Content-Type": "application/octet-stream"},
         )
@@ -68,7 +70,15 @@ def run_local_tesseract(image_bytes: bytes) -> str:
         image_file.flush()
         try:
             result = subprocess.run(
-                ["tesseract", image_file.name, "stdout", "--psm", "6"],
+                [
+                    "tesseract",
+                    image_file.name,
+                    "stdout",
+                    "-l",
+                    settings.OCR_LANGUAGES,
+                    "--psm",
+                    "6",
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -81,4 +91,3 @@ def run_local_tesseract(image_bytes: bytes) -> str:
 
 def _clean_line(line: str) -> str:
     return " ".join(line.strip().split())
-

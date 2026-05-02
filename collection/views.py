@@ -6,23 +6,36 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from collection.forms import CSVImportForm, CardSearchForm, CollectionFilterForm, OwnedCardForm, PhotoUploadForm
+from collection.forms import (
+    CSVImportForm,
+    CardSearchForm,
+    CollectionFilterForm,
+    OwnedCardForm,
+    PhotoUploadForm,
+)
 from collection.models import CardCondition, CardMetadata, CardVariant, OCRJob, OwnedCard, SetMetadata
 from collection.services.aggregates import summarize_collection
 from collection.services.csv_io import export_owned_cards_response, import_owned_cards_csv_bytes
-from collection.services.ocr import guess_from_ocr_text
+from collection.services.ocr import OCRClient, OCRGuess, OCRServiceError, guess_from_ocr_text
 from collection.services.pokemon_tcg import PokemonTCGAPIError, PokemonTCGClient, upsert_card_metadata
-from collection.services.set_progress import cached_set_progresses, ensure_set_checklist, refresh_set_catalog, refresh_set_metadata, set_card_progress
+from collection.services.set_progress import (
+    cached_set_progresses,
+    ensure_set_checklist,
+    refresh_set_catalog,
+    refresh_set_metadata,
+    set_card_progress,
+)
 from collection.tasks import process_ocr_job, refresh_card_metadata, refresh_owned_card_prices
 
 
 SET_CHECKLIST_PAGE_SIZE = 48
+COLLECTION_PAGE_SIZE = 50
 
 
 @login_required
@@ -42,16 +55,27 @@ def collection_list(request):
     owned_cards = OwnedCard.objects.select_related("card")
     if form.is_valid():
         owned_cards = _filter_owned_cards(owned_cards, form.cleaned_data)
+    page_obj = _paginate_collection(request, owned_cards)
     return render(
         request,
         "collection/collection_list.html",
-        {"form": form, "owned_cards": owned_cards},
+        {
+            "form": form,
+            "owned_cards": page_obj,
+            "page_obj": page_obj,
+            "pagination_query": _pagination_query(request),
+        },
     )
 
 
 @login_required
 def card_detail(request, external_id: str):
-    card = get_object_or_404(CardMetadata.objects.prefetch_related("owned_cards"), external_id=external_id)
+    card = get_object_or_404(
+        CardMetadata.objects.prefetch_related(
+            Prefetch("owned_cards", queryset=OwnedCard.objects.select_related("card"))
+        ),
+        external_id=external_id,
+    )
     return render(request, "collection/card_detail.html", {"card": card})
 
 
@@ -119,24 +143,21 @@ def camera_add(request):
 @require_POST
 def camera_candidates(request):
     try:
-        payload = json.loads(request.body.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return JsonResponse({"error": "Invalid request body."}, status=400)
+        text = _camera_text_from_request(request)
+    except ValueError as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    except OCRServiceError as error:
+        return JsonResponse({"error": str(error)}, status=502)
 
-    text = str(payload.get("text", "")).strip()
     if not text:
         return JsonResponse({"error": "No OCR text was provided."}, status=400)
 
     guess = guess_from_ocr_text(text)
     if not guess.query and not guess.card_number:
-        return JsonResponse({"candidates": [], "manual_search_url": reverse("add_search")})
+        return JsonResponse({"text": text, "candidates": [], "manual_search_url": reverse("add_search")})
 
     try:
-        card_data = PokemonTCGClient().search_cards(
-            query=guess.query,
-            card_number=guess.card_number,
-            page_size=8,
-        )
+        card_data = _search_ocr_candidates(guess)
     except PokemonTCGAPIError as error:
         return JsonResponse({"error": str(error)}, status=502)
 
@@ -146,6 +167,7 @@ def camera_candidates(request):
         query_params["card_number"] = guess.card_number
     return JsonResponse(
         {
+            "text": text,
             "query": guess.query,
             "card_number": guess.card_number,
             "manual_search_url": f"{reverse('add_search')}?{urlencode(query_params)}",
@@ -175,7 +197,56 @@ def add_owned_card(request, external_id: str):
     else:
         form = OwnedCardForm()
 
-    return render(request, "collection/add_owned.html", {"card": card, "form": form})
+    return render(
+        request,
+        "collection/add_owned.html",
+        {
+            "card": card,
+            "form": form,
+            "page_title": f"Add {card.name}",
+            "submit_label": "Add to collection",
+            "back_url": reverse("add_search"),
+        },
+    )
+
+
+@login_required
+def edit_owned_card(request, owned_id: int):
+    owned_card = get_object_or_404(OwnedCard.objects.select_related("card"), id=owned_id)
+    next_url = _safe_url(request.POST.get("next", "") or request.GET.get("next", ""))
+
+    if request.method == "POST":
+        form = OwnedCardForm(request.POST, instance=owned_card)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Card details updated.")
+            return redirect(next_url or reverse("card_detail", args=[owned_card.card.external_id]))
+    else:
+        form = OwnedCardForm(instance=owned_card)
+
+    return render(
+        request,
+        "collection/add_owned.html",
+        {
+            "card": owned_card.card,
+            "form": form,
+            "next_url": next_url,
+            "page_title": f"Edit {owned_card.card.name}",
+            "submit_label": "Save changes",
+            "back_url": next_url or reverse("card_detail", args=[owned_card.card.external_id]),
+        },
+    )
+
+
+@login_required
+@require_POST
+def delete_owned_card(request, owned_id: int):
+    owned_card = get_object_or_404(OwnedCard.objects.select_related("card"), id=owned_id)
+    card = owned_card.card
+    next_url = _safe_url(request.POST.get("next", ""))
+    owned_card.delete()
+    messages.success(request, f"Removed {card.name} from your collection.")
+    return redirect(next_url or reverse("card_detail", args=[card.external_id]))
 
 
 @login_required
@@ -189,15 +260,30 @@ def quick_add_card(request, external_id: str):
             messages.error(request, str(error))
             return redirect("camera_add")
 
-    owned_card = OwnedCard(
+    owned_card = OwnedCard.objects.filter(
         card=card,
         variant=CardVariant.NORMAL,
+        variant_custom="",
         language="en",
         condition=CardCondition.NEAR_MINT,
-        quantity=1,
-    )
-    owned_card.full_clean()
-    owned_card.save()
+        purchase_price__isnull=True,
+        purchase_date__isnull=True,
+        notes="",
+    ).first()
+    if owned_card is None:
+        owned_card = OwnedCard(
+            card=card,
+            variant=CardVariant.NORMAL,
+            language="en",
+            condition=CardCondition.NEAR_MINT,
+            quantity=1,
+        )
+        owned_card.full_clean()
+        owned_card.save()
+    else:
+        owned_card.quantity += 1
+        owned_card.full_clean()
+        owned_card.save(update_fields=["quantity", "updated_at"])
     messages.success(request, f"Added {card.name} to your collection.")
     return redirect("card_detail", external_id=card.external_id)
 
@@ -269,7 +355,10 @@ def set_detail(request, set_id: str):
 @login_required
 @require_POST
 def refresh_set(request, set_id: str):
-    if not (SetMetadata.objects.filter(external_id=set_id).exists() or CardMetadata.objects.filter(set_id=set_id).exists()):
+    if not (
+        SetMetadata.objects.filter(external_id=set_id).exists()
+        or CardMetadata.objects.filter(set_id=set_id).exists()
+    ):
         return HttpResponseBadRequest("Unknown set.")
     try:
         count = refresh_set_metadata(set_id)
@@ -338,6 +427,36 @@ def _filter_owned_cards(queryset, cleaned_data: dict):
     return queryset
 
 
+def _camera_text_from_request(request) -> str:
+    content_type = request.headers.get("Content-Type", "")
+    if content_type.startswith("application/json"):
+        try:
+            payload = json.loads(request.body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError("Invalid request body.") from error
+        return str(payload.get("text", "")).strip()
+
+    image = request.FILES.get("image")
+    if image is None:
+        raise ValueError("No image was provided.")
+    return OCRClient().extract_text_bytes(image.read()).strip()
+
+
+def _search_ocr_candidates(guess: OCRGuess) -> list[dict]:
+    if not guess.query and not guess.card_number:
+        return []
+
+    client = PokemonTCGClient()
+    candidates = client.search_cards(
+        query=guess.query,
+        card_number=guess.card_number,
+        page_size=8,
+    )
+    if not candidates and guess.query and guess.card_number:
+        candidates = client.search_cards(card_number=guess.card_number, page_size=8)
+    return candidates
+
+
 def _candidate_payload(card: CardMetadata) -> dict[str, str | None]:
     return {
         "external_id": card.external_id,
@@ -355,12 +474,26 @@ def _candidate_payload(card: CardMetadata) -> dict[str, str | None]:
 
 
 def _safe_next(request, fallback_name: str) -> str:
-    next_url = request.POST.get("next", "")
-    if next_url.startswith("/") and not next_url.startswith("//"):
-        return next_url
-    return reverse(fallback_name)
+    return _safe_url(request.POST.get("next", "")) or reverse(fallback_name)
+
+
+def _safe_url(value: str) -> str:
+    if value.startswith("/") and not value.startswith("//"):
+        return value
+    return ""
 
 
 def _paginate_set_cards(request, cards):
     paginator = Paginator(cards, SET_CHECKLIST_PAGE_SIZE)
     return paginator.get_page(request.GET.get("page"))
+
+
+def _paginate_collection(request, owned_cards):
+    paginator = Paginator(owned_cards, COLLECTION_PAGE_SIZE)
+    return paginator.get_page(request.GET.get("page"))
+
+
+def _pagination_query(request) -> str:
+    query = request.GET.copy()
+    query.pop("page", None)
+    return query.urlencode()

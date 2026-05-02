@@ -8,9 +8,14 @@ services:
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
-      SQLITE_PATH: /app/pokestock.sqlite3
+      POSTGRES_DB: ${POSTGRES_DB:-pokestock}
+      POSTGRES_USER: ${POSTGRES_USER:-pokestock}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pokestock}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
       REDIS_URL: redis://redis:6379/0
       OCR_SERVICE_URL: http://ocr:8080
+      OCR_LANGUAGES: ${OCR_LANGUAGES:-eng+deu+spa+jpn}
     command: >
       sh -c "python manage.py migrate &&
              python manage.py ensureadmin &&
@@ -25,8 +30,12 @@ services:
       - .:/app
       - ./media:/app/media
     depends_on:
-      - redis
-      - ocr
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      ocr:
+        condition: service_started
 
   worker:
     build: .
@@ -34,9 +43,14 @@ services:
       - path: .env
         required: false
     environment:
-      SQLITE_PATH: /app/pokestock.sqlite3
+      POSTGRES_DB: ${POSTGRES_DB:-pokestock}
+      POSTGRES_USER: ${POSTGRES_USER:-pokestock}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pokestock}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
       REDIS_URL: redis://redis:6379/0
       OCR_SERVICE_URL: http://ocr:8080
+      OCR_LANGUAGES: ${OCR_LANGUAGES:-eng+deu+spa+jpn}
     command: celery -A pokestock_project worker --loglevel=info --beat
     networks:
       - pokestock-egress
@@ -45,8 +59,28 @@ services:
       - .:/app
       - ./media:/app/media
     depends_on:
-      - redis
-      - ocr
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      ocr:
+        condition: service_started
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pokestock}
+      POSTGRES_USER: ${POSTGRES_USER:-pokestock}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pokestock}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - pokestock-internal
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
@@ -59,10 +93,13 @@ services:
     build:
       context: .
       dockerfile: ocr_service/Dockerfile
+    environment:
+      OCR_LANGUAGES: ${OCR_LANGUAGES:-eng+deu+spa+jpn}
     networks:
       - pokestock-internal
 
 volumes:
+  postgres-data:
   redis-data:
 
 networks:

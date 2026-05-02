@@ -68,17 +68,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "pokestock_project.wsgi.application"
 
-sqlite_path = Path(env("SQLITE_PATH", str(BASE_DIR / "pokestock.sqlite3")))
-if not sqlite_path.is_absolute():
-    sqlite_path = BASE_DIR / sqlite_path
-
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": sqlite_path,
-        "OPTIONS": {
-            "timeout": 20,
-        },
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("POSTGRES_DB", "pokestock"),
+        "USER": env("POSTGRES_USER", "pokestock"),
+        "PASSWORD": env("POSTGRES_PASSWORD", "pokestock"),
+        "HOST": env("POSTGRES_HOST", "localhost"),
+        "PORT": env("POSTGRES_PORT", "5432"),
+        "CONN_MAX_AGE": int(env("POSTGRES_CONN_MAX_AGE", "60")),
     }
 }
 
@@ -121,4 +119,5 @@ CELERY_BEAT_SCHEDULE = {
 POKEMONTCG_API_BASE_URL = env("POKEMONTCG_API_BASE_URL", "https://api.pokemontcg.io/v2")
 POKEMONTCG_API_KEY = env("POKEMONTCG_API_KEY")
 OCR_SERVICE_URL = env("OCR_SERVICE_URL", "http://localhost:8080")
+OCR_LANGUAGES = env("OCR_LANGUAGES", "eng+deu+spa+jpn")
 PRICE_STALE_AFTER_DAYS = int(env("PRICE_STALE_AFTER_DAYS", "1"))

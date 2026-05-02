@@ -51,6 +51,7 @@
               <th>Language</th>
               <th>Qty</th>
               <th>Value</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -61,9 +62,19 @@
                 <td>{{ owned.language }}</td>
                 <td>{{ owned.quantity }}</td>
                 <td>{{ owned.row_value|money:card.price_currency }}</td>
+                <td>
+                  <div class="actions table-actions">
+                    <a class="button secondary" href="{% url 'edit_owned_card' owned.id %}?next={{ request.get_full_path|urlencode }}">Edit</a>
+                    <form method="post" action="{% url 'delete_owned_card' owned.id %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                      <button class="danger" type="submit">Remove</button>
+                    </form>
+                  </div>
+                </td>
               </tr>
             {% empty %}
-              <tr><td colspan="5">No owned copies yet.</td></tr>
+              <tr><td colspan="6">No owned copies yet.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -71,4 +82,3 @@
     </div>
   </section>
 {% endblock %}
-

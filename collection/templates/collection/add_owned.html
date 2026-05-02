@@ -1,15 +1,15 @@
 {% extends "collection/base.html" %}
 {% load collection_extras %}
 
-{% block title %}Add {{ card.name }} - PokeStock{% endblock %}
+{% block title %}{{ page_title }} - PokeStock{% endblock %}
 
 {% block content %}
   <div class="page-head">
     <div>
-      <h1>Add {{ card.name }}</h1>
+      <h1>{{ page_title }}</h1>
       <p class="subtle">{{ card.set_name }} #{{ card.card_number }} - {{ card.price_value|money:card.price_currency }}</p>
     </div>
-    <a class="button secondary" href="{% url 'add_search' %}">Back to search</a>
+    <a class="button secondary" href="{{ back_url }}">Back</a>
   </div>
 
   <section class="detail-layout">
@@ -20,6 +20,9 @@
     </div>
     <form class="card" method="post">
       {% csrf_token %}
+      {% if next_url %}
+        <input type="hidden" name="next" value="{{ next_url }}">
+      {% endif %}
       {{ form.non_field_errors }}
       <div class="form-grid">
         {% for field in form %}
@@ -31,7 +34,7 @@
         {% endfor %}
       </div>
       <div class="actions form-actions">
-        <button type="submit">Add to collection</button>
+        <button type="submit">{{ submit_label }}</button>
       </div>
     </form>
   </section>

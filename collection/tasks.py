@@ -65,4 +65,8 @@ def process_ocr_job(job_id: int) -> str:
 def _search_ocr_candidates(query: str, card_number: str) -> list[dict]:
     if not query and not card_number:
         return []
-    return PokemonTCGClient().search_cards(query=query, card_number=card_number, page_size=8)
+    client = PokemonTCGClient()
+    candidates = client.search_cards(query=query, card_number=card_number, page_size=8)
+    if not candidates and query and card_number:
+        candidates = client.search_cards(card_number=card_number, page_size=8)
+    return candidates

@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+
+OCR_LANGUAGES = os.environ.get("OCR_LANGUAGES", "eng+deu+spa+jpn")
+OCR_PAGE_SEGMENTATION_MODE = os.environ.get("OCR_PAGE_SEGMENTATION_MODE", "6")
 
 
 class OCRHandler(BaseHTTPRequestHandler):
@@ -49,7 +54,15 @@ def run_tesseract(image_bytes: bytes) -> str:
         image_file.flush()
         try:
             result = subprocess.run(
-                ["tesseract", image_file.name, "stdout", "--psm", "6"],
+                [
+                    "tesseract",
+                    image_file.name,
+                    "stdout",
+                    "-l",
+                    OCR_LANGUAGES,
+                    "--psm",
+                    OCR_PAGE_SEGMENTATION_MODE,
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -67,4 +80,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

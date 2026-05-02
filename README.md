@@ -20,20 +20,21 @@ Self-hosted Django app for tracking a single-user Pokemon card collection with C
 
 4. Open `http://localhost:8000` and log in with `DJANGO_SUPERUSER_USERNAME` and `DJANGO_SUPERUSER_PASSWORD`.
 
-The SQLite database is stored at `./pokestock.sqlite3` in the project base folder. Uploaded images are stored in `./media`.
+PostgreSQL data is stored in the Docker volume `postgres-data`. Uploaded images are stored in `./media`.
 
 ## Services
 
 - `web`: Django, server-rendered UI, admin, and HTTP endpoints.
 - `worker`: Celery worker with a simple daily beat schedule for price refresh.
+- `db`: PostgreSQL database for Django data.
 - `redis`: Celery broker/result backend.
 - `ocr`: Local Tesseract HTTP service used by photo-assisted adding.
 
-Only the `web` service publishes a host port (`8000`). Redis and OCR are reachable only inside the Docker network.
+Only the `web` service publishes a host port (`8000`). PostgreSQL, Redis, and OCR are reachable only inside the Docker network.
 
 ## Camera Add
 
-The primary camera flow is browser-based for iOS Safari and mobile browsers. The card image is read by Tesseract.js in the browser, and only extracted text is sent to Django for candidate matching. Captured photos are not uploaded or stored by this flow.
+The primary camera flow sends the captured image to the internal OCR service for multilingual Tesseract recognition. The service is configured for English, German, Spanish, and Japanese by default. Captured photos from this flow are processed in memory and are not stored.
 
 ## Set Progress
 
@@ -43,10 +44,13 @@ The Sets page shows progress only for sets where at least one card is owned, usi
 
 ## Local Development
 
+For the simplest local setup, use `docker compose up --build`. If you run Django outside Docker, start a PostgreSQL instance first and point the `POSTGRES_*` environment variables at it.
+
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
+export POSTGRES_HOST=localhost
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver

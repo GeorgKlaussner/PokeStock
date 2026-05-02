@@ -7,7 +7,7 @@
   <div class="page-head">
     <div>
       <h1>Camera add</h1>
-      <p class="subtle">Capture a card on iOS, read it in the browser, and send only text to PokeStock.</p>
+      <p class="subtle">Capture a card and read it with multilingual OCR.</p>
     </div>
     <a class="button secondary" href="{% url 'add_search' %}">Manual search</a>
   </div>
@@ -39,7 +39,5 @@
     <a class="button secondary" id="camera-manual-link" href="{% url 'add_search' %}" hidden>Search manually</a>
   </section>
 
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="{% static 'camera_add.js' %}"></script>
 {% endblock %}
-

@@ -41,21 +41,26 @@
     }
 
     processButton.disabled = true;
-    status.textContent = "Reading card text in this browser...";
+    status.textContent = "Reading card text...";
     clearResults();
 
     try {
-      if (!window.Tesseract) {
-        throw new Error("OCR library did not load.");
-      }
-      const result = await window.Tesseract.recognize(file, "eng", {
-        logger: (message) => {
-          if (message.status === "recognizing text" && message.progress) {
-            status.textContent = `Reading text ${Math.round(message.progress * 100)}%`;
-          }
+      const formData = new FormData();
+      formData.append("image", file, file.name || "card-photo.jpg");
+      const response = await fetch(candidatesUrl, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": csrfToken,
+          "X-Requested-With": "XMLHttpRequest",
         },
+        body: formData,
       });
-      const text = (result.data.text || "").trim();
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Card matching failed.");
+      }
+
+      const text = (payload.text || "").trim();
       textOutput.textContent = text || "No text was recognized.";
       textOutput.hidden = false;
       clearImageInput();
@@ -65,20 +70,6 @@
         return;
       }
 
-      status.textContent = "Searching PokemonTCG...";
-      const response = await fetch(candidatesUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrfToken,
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: JSON.stringify({ text }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || "Card matching failed.");
-      }
       renderCandidates(payload);
     } catch (error) {
       status.textContent = error.message;
@@ -175,4 +166,3 @@
     return article;
   }
 })();
-

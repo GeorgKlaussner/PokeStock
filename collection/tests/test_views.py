@@ -69,6 +69,46 @@ class ManualAddFlowTests(TestCase):
         self.assertRedirects(response, reverse("card_detail", args=[card.external_id]))
         self.assertEqual(OwnedCard.objects.get().quantity, 2)
 
+    def test_edit_owned_card_updates_quantity(self):
+        card = card_metadata(external_id="sv1-10", name="Pikachu")
+        owned = OwnedCard.objects.create(card=card, quantity=1)
+
+        response = self.client.post(
+            reverse("edit_owned_card", args=[owned.id]),
+            {
+                "variant": "normal",
+                "variant_custom": "",
+                "language": "en",
+                "condition": "near_mint",
+                "quantity": "4",
+                "purchase_price": "",
+                "purchase_date": "",
+                "notes": "",
+            },
+        )
+
+        self.assertRedirects(response, reverse("card_detail", args=[card.external_id]))
+        owned.refresh_from_db()
+        self.assertEqual(owned.quantity, 4)
+
+    def test_delete_owned_card_removes_row(self):
+        card = card_metadata(external_id="sv1-10", name="Pikachu")
+        owned = OwnedCard.objects.create(card=card, quantity=1)
+
+        response = self.client.post(reverse("delete_owned_card", args=[owned.id]))
+
+        self.assertRedirects(response, reverse("card_detail", args=[card.external_id]))
+        self.assertFalse(OwnedCard.objects.filter(id=owned.id).exists())
+
+    def test_collection_list_renders_owned_card_actions(self):
+        card = card_metadata(external_id="sv1-10", name="Pikachu")
+        owned = OwnedCard.objects.create(card=card, quantity=1)
+
+        response = self.client.get(reverse("collection_list"))
+
+        self.assertContains(response, reverse("edit_owned_card", args=[owned.id]))
+        self.assertContains(response, reverse("delete_owned_card", args=[owned.id]))
+
     def test_set_pages_render_owned_and_missing_cards(self):
         set_metadata(external_id="sv1", name="Scarlet & Violet", total=2)
         owned_card_metadata = card_metadata(

@@ -11,17 +11,16 @@ The app is optimized for private home-server use, not public SaaS multi-tenancy.
 ## Core Architecture Choices
 
 - Use a Django monolith with server-rendered pages.
-- Use SQLite as the application database.
-- Store the SQLite file in the project root as `pokestock.sqlite3`; this file is ignored by git.
+- Use PostgreSQL as the application database through Docker Compose.
 - Run locally or through Docker Compose with these services:
   - `web`: Django app.
   - `worker`: Celery worker/beat.
+  - `db`: PostgreSQL database.
   - `redis`: broker/cache.
-  - `ocr`: local OCR service for the legacy upload flow.
-- Only `web` should publish a host port. Redis and OCR must remain reachable only through the internal Docker network.
+  - `ocr`: local OCR service for camera and upload flows.
+- Only `web` should publish a host port. PostgreSQL, Redis, and OCR must remain reachable only through the internal Docker network.
 - The app Dockerfile should not declare `EXPOSE 8000`; Compose is the source of truth for publishing only the `web` service.
 - In the current self-hosted v1 stack, Django serves static assets in `DEBUG` mode via `staticfiles_urlpatterns()`. There is no Nginx or WhiteNoise layer yet.
-- Do not add Postgres for v1.
 - Do not commit secrets. Use `.env.example` for configuration shape.
 - Require one local admin login. No public registration or multi-user tenancy in v1.
 
@@ -121,17 +120,15 @@ Relevant code:
 
 ## Camera Add Behavior
 
-The preferred camera flow is browser-based for iOS:
+The preferred camera flow uses the internal OCR service:
 - User captures/selects a photo via `<input type="file" accept="image/*" capture="environment">`.
-- Browser-side OCR reads the image.
-- Only extracted text is posted to Django.
+- Django forwards the image bytes to the OCR service.
+- Tesseract is configured for English, German, Spanish, and Japanese.
 - The image is not uploaded or stored by this flow.
 
 This was built to make mobile/iOS card adding faster while respecting the user's request not to store photos.
 
-Important caveat:
-- The current browser OCR flow loads Tesseract.js from jsDelivr.
-- For a fully offline/private self-hosted setup, vendor this JS asset locally.
+This keeps OCR fully inside the compose stack while avoiding persisted camera photos.
 
 Relevant code:
 - `collection/templates/collection/camera_add.html`
@@ -141,18 +138,7 @@ Relevant code:
 
 ## Local Data Notes
 
-The local ignored SQLite database was populated during implementation:
-- PokemonTCG set catalog synced: 172 sets.
-- Scarlet & Violet 151 (`sv3pt5`) checklist synced: 207 cards.
-- A German Charizard from 151 was added:
-  - card id: `sv3pt5-6`
-  - name: `Charizard ex`
-  - language: `de`
-  - quantity: `1`
-  - variant: `holofoil`
-  - condition: `unknown`
-
-This data lives in `pokestock.sqlite3`, which is intentionally not tracked by git.
+The PostgreSQL volume is intentionally not tracked by git. The move from SQLite was treated as a fresh-database switch; existing local SQLite data was not migrated.
 
 ## UI Direction
 
@@ -172,24 +158,23 @@ Keep future UI changes consistent with this direction.
 
 ## Verification Commands
 
-Use the project virtualenv:
+Use Docker Compose so tests run against PostgreSQL:
 
 ```sh
-.venv/bin/python manage.py check
-.venv/bin/python manage.py test
-.venv/bin/python manage.py makemigrations --check --dry-run
 docker compose config --quiet
+docker compose run --rm web python manage.py check
+docker compose run --rm web python manage.py test
+docker compose run --rm web python manage.py makemigrations --check --dry-run
 ```
 
 Expected current state after the latest changes:
-- Full test suite passes with 44 tests.
+- Full test suite passes.
 - No pending migrations.
 - Docker Compose config validates.
 
 ## Known Tradeoffs And Follow-Ups
 
-- Browser OCR uses a CDN-hosted Tesseract.js file. Vendor it locally for fully self-hosted/offline operation.
-- Pagination is fixed at 48 cards per page. If the user wants control, add a page-size selector.
-- Quick add currently uses default details (`en`, normal, near mint). This is fast but may need user-configurable defaults.
+- Pagination is fixed at 48 set cards and 50 collection rows per page. If the user wants control, add a page-size selector.
+- Quick add uses default details (`en`, normal, near mint) and increments an existing matching default row. This is fast but may need user-configurable defaults.
 - The legacy OCR upload flow still stores uploaded images because it is separate from the no-storage browser camera flow.
 - Set catalog refresh is manual from the UI. A scheduled background refresh could be added later.

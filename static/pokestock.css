@@ -276,6 +276,10 @@ h2 {
   gap: 0.55rem;
 }
 
+.table-actions {
+  flex-wrap: nowrap;
+}
+
 .form-actions {
   margin-top: 1rem;
 }
@@ -307,6 +311,12 @@ button.secondary {
 .button.warning {
   background: var(--warning);
   border-color: var(--warning);
+}
+
+.button.danger,
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
 }
 
 .button:hover,
