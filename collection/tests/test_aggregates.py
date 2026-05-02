@@ -6,7 +6,7 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import timezone
 
-from collection.models import CardVariant
+from collection.models import CardCondition, CardVariant
 from collection.services.aggregates import summarize_collection
 from collection.tests.factories import card_metadata, owned_card
 
@@ -56,3 +56,13 @@ class AggregateTests(TestCase):
 
         self.assertEqual(owned.unit_value, Decimal("7.50"))
         self.assertEqual(owned.row_value, Decimal("15.00"))
+
+    def test_owned_value_accounts_for_language_and_condition(self):
+        card = card_metadata(
+            latest_price_payload={"prices": {"averageSellPrice": 10, "germanProLow": 6.5}},
+            price_value=Decimal("10.00"),
+        )
+        owned = owned_card(card=card, language="de", condition=CardCondition.GOOD, quantity=2)
+
+        self.assertEqual(owned.unit_value, Decimal("4.55"))
+        self.assertEqual(owned.row_value, Decimal("9.10"))

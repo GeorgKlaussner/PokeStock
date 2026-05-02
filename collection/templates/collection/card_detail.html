@@ -21,14 +21,14 @@
   <section class="detail-layout">
     <div>
       {% if card.image_large_url %}
-        <img class="detail-image" src="{{ card.image_large_url }}" alt="{{ card.name }}">
+        <img class="detail-image" src="{{ card.image_large_url }}" alt="{{ card.name }}" loading="eager" decoding="async" fetchpriority="high">
       {% elif card.image_small_url %}
-        <img class="detail-image" src="{{ card.image_small_url }}" alt="{{ card.name }}">
+        <img class="detail-image" src="{{ card.image_small_url }}" alt="{{ card.name }}" loading="eager" decoding="async" fetchpriority="high">
       {% endif %}
     </div>
     <div class="grid">
       <section class="card">
-        <h2>Current price</h2>
+        <h2>Average sale price</h2>
         <p class="stat-value">{{ card.price_value|money:card.price_currency }}</p>
         <p class="subtle">
           {% if card.price_source_field %}{{ card.price_source_field }}{% else %}No source field{% endif %}

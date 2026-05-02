@@ -15,7 +15,7 @@
   <section class="detail-layout">
     <div>
       {% if card.image_small_url %}
-        <img class="detail-image" src="{{ card.image_small_url }}" alt="{{ card.name }}">
+        <img class="detail-image" src="{{ card.image_small_url }}" alt="{{ card.name }}" loading="eager" decoding="async" fetchpriority="high">
       {% endif %}
     </div>
     <form class="card" method="post">

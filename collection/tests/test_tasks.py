@@ -7,8 +7,13 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
 from collection.models import CardMetadata, OCRJob
-from collection.tasks import process_ocr_job, refresh_card_metadata, refresh_owned_card_prices
-from collection.tests.factories import card_metadata, owned_card
+from collection.tasks import (
+    process_ocr_job,
+    refresh_card_metadata,
+    refresh_owned_card_prices,
+    refresh_set_checklist,
+)
+from collection.tests.factories import card_metadata, owned_card, set_metadata
 
 
 class TaskTests(TestCase):
@@ -42,6 +47,24 @@ class TaskTests(TestCase):
         self.assertEqual(result, "ok")
         self.assertEqual(card.name, "Updated")
 
+    def test_refresh_set_checklist_records_api_data(self):
+        set_metadata(external_id="sv1", name="Scarlet & Violet", total=1)
+        payload = [
+            {
+                "id": "sv1-1",
+                "name": "Sprigatito",
+                "number": "1",
+                "set": {"id": "sv1", "name": "Scarlet & Violet", "total": 1},
+                "cardmarket": {"prices": {"trendPrice": 2.5}},
+            },
+        ]
+
+        with patch("collection.services.set_progress.PokemonTCGClient.fetch_set_cards", return_value=payload):
+            result = refresh_set_checklist("sv1")
+
+        self.assertEqual(result, 1)
+        self.assertTrue(CardMetadata.objects.filter(external_id="sv1-1").exists())
+
     def test_process_ocr_job_stores_candidates(self):
         with tempfile.TemporaryDirectory() as media_root:
             with override_settings(MEDIA_ROOT=media_root):
@@ -63,4 +86,3 @@ class TaskTests(TestCase):
                 self.assertEqual(job.status, OCRJob.Status.COMPLETE)
                 self.assertEqual(job.candidate_ids, ["sv1-25"])
                 self.assertTrue(CardMetadata.objects.filter(external_id="sv1-25").exists())
-

@@ -31,9 +31,9 @@ The app is optimized for private home-server use, not public SaaS multi-tenancy.
 - Direct Cardmarket API integration is intentionally out of scope for v1 because new Cardmarket API applications are currently not generally accepted.
 - PokemonTCG API calls intentionally ignore SSL certificate verification in this app because the user was hitting local SSL errors and requested this behavior.
 - Price selection behavior:
-  - Prefer `trendPrice`.
-  - For reverse holo variants, prefer `reverseHoloTrend`.
-  - Fall back to `averageSellPrice`, then `lowPrice`.
+  - Prefer average sold prices (`averageSellPrice`, or reverse-holo average fields for reverse holo variants).
+  - Fall back to trend prices, then low prices, when average fields are missing.
+  - Owned-row values apply local modifiers for condition and non-English language data; German cards use `germanProLow` when it is lower than the generic average.
   - Missing prices are excluded from totals and shown as unavailable.
 
 Relevant code:
@@ -97,7 +97,7 @@ There are two different set browsing surfaces:
   - This is intentionally not a full catalog view.
 
 Set detail/checklist behavior:
-- Opening a set ensures the checklist is present or refreshes it from PokemonTCG API if incomplete.
+- Opening a set renders cached checklist data immediately. If the checklist is incomplete, the page queues a Celery refresh instead of blocking the request on PokemonTCG API.
 - Owned cards are shown in full color.
 - Missing cards are shown in grayscale.
 - Cards are paginated at 48 per page.

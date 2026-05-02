@@ -20,8 +20,8 @@ def card_metadata(**overrides) -> CardMetadata:
             "updatedAt": "2024/01/01",
             "prices": {"trendPrice": 3.25, "reverseHoloTrend": 4.5, "averageSellPrice": 3.0, "lowPrice": 2.0},
         },
-        "price_value": Decimal("3.25"),
-        "price_source_field": "trendPrice",
+        "price_value": Decimal("3.00"),
+        "price_source_field": "averageSellPrice",
         "price_currency": "EUR",
         "api_synced_at": timezone.now(),
     }

@@ -31,7 +31,7 @@
         {% for card in candidates %}
           <article class="card candidate">
             {% if card.image_small_url %}
-              <img src="{{ card.image_small_url }}" alt="{{ card.name }}">
+              <img src="{{ card.image_small_url }}" alt="{{ card.name }}" loading="lazy" decoding="async">
             {% endif %}
             <div>
               <h2>{{ card.name }}</h2>
@@ -46,4 +46,3 @@
     </section>
   {% endif %}
 {% endblock %}
-

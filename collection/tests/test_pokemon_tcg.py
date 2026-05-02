@@ -131,12 +131,16 @@ class PokemonTCGClientTests(TestCase):
                 "updatedAt": "2024/01/02",
                 "images": {"small": "https://example.test/small.png", "large": "https://example.test/large.png"},
                 "set": {"id": "sv1", "name": "Scarlet & Violet", "series": "Scarlet & Violet", "releaseDate": "2023/03/31"},
-                "cardmarket": {"url": "https://example.test/card", "updatedAt": "2024/02/01", "prices": {"trendPrice": 1.23}},
+                "cardmarket": {
+                    "url": "https://example.test/card",
+                    "updatedAt": "2024/02/01",
+                    "prices": {"trendPrice": 1.23, "averageSellPrice": 1.1},
+                },
             }
         )
 
         self.assertEqual(card.external_id, "sv1-1")
         self.assertEqual(card.set_name, "Scarlet & Violet")
-        self.assertEqual(card.price_value, Decimal("1.23"))
-        self.assertEqual(card.price_source_field, "trendPrice")
+        self.assertEqual(card.price_value, Decimal("1.10"))
+        self.assertEqual(card.price_source_field, "averageSellPrice")
         self.assertTrue(SetMetadata.objects.filter(external_id="sv1").exists())

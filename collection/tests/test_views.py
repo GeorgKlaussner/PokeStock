@@ -183,7 +183,7 @@ class ManualAddFlowTests(TestCase):
         self.assertContains(second_page, "Page 2 of 2")
         self.assertContains(second_page, "Card 49")
 
-    def test_set_detail_uses_official_total_for_incomplete_checklist(self):
+    def test_set_detail_queues_incomplete_checklist_without_blocking(self):
         set_metadata(external_id="sv3pt5", name="151", total=207)
         card = card_metadata(
             external_id="sv3pt5-6",
@@ -194,8 +194,29 @@ class ManualAddFlowTests(TestCase):
         )
         OwnedCard.objects.create(card=card, quantity=1)
 
-        with patch("collection.views.ensure_set_checklist", return_value=1):
+        with patch("collection.views.refresh_set_checklist.delay") as delay:
             response = self.client.get(reverse("set_detail", args=["sv3pt5"]))
 
         self.assertContains(response, "1 of 207 cards owned")
         self.assertContains(response, "0% complete")
+        self.assertContains(response, "Checklist refresh queued")
+        delay.assert_called_once_with("sv3pt5")
+
+    def test_set_detail_does_not_requeue_recent_checklist_refresh(self):
+        metadata = set_metadata(external_id="sv3pt5", name="151", total=207)
+        metadata.checklist_refresh_queued_at = metadata.updated_at
+        metadata.save(update_fields=["checklist_refresh_queued_at", "updated_at"])
+        card = card_metadata(
+            external_id="sv3pt5-6",
+            name="Charizard ex",
+            set_id="sv3pt5",
+            set_name="151",
+            card_number="6",
+        )
+        OwnedCard.objects.create(card=card, quantity=1)
+
+        with patch("collection.views.refresh_set_checklist.delay") as delay:
+            response = self.client.get(reverse("set_detail", args=["sv3pt5"]))
+
+        self.assertContains(response, "Checklist is incomplete")
+        delay.assert_not_called()

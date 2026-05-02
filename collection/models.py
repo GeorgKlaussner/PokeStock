@@ -98,6 +98,7 @@ class SetMetadata(models.Model):
     logo_url = models.URLField(blank=True)
     api_updated_at = models.CharField(max_length=64, blank=True)
     api_synced_at = models.DateTimeField(null=True, blank=True)
+    checklist_refresh_queued_at = models.DateTimeField(null=True, blank=True)
     last_sync_error = models.TextField(blank=True)
     last_sync_attempt_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -152,11 +153,20 @@ class OwnedCard(models.Model):
 
     @property
     def unit_value(self) -> Decimal | None:
-        from collection.services.pricing import select_cardmarket_price
+        from collection.services.pricing import adjust_owned_price_value, select_cardmarket_price
 
         if self.card.latest_price_payload:
-            return select_cardmarket_price(self.card.latest_price_payload, self.variant).value
-        return self.card.price_value
+            return select_cardmarket_price(
+                self.card.latest_price_payload,
+                self.variant,
+                language=self.language,
+                condition=self.condition,
+            ).value
+        return adjust_owned_price_value(
+            self.card.price_value,
+            language=self.language,
+            condition=self.condition,
+        )
 
     @property
     def row_value(self) -> Decimal | None:

@@ -37,7 +37,7 @@
       {% for set in sets %}
         <a class="set-list-item" href="{% url 'add_set_cards' set.external_id %}">
           {% if set.logo_url %}
-            <img src="{{ set.logo_url }}" alt="{{ set.name }}">
+            <img src="{{ set.logo_url }}" alt="{{ set.name }}" loading="lazy" decoding="async">
           {% endif %}
           <span>
             <strong>{{ set.name }}</strong>
@@ -73,7 +73,7 @@
         {% for card in candidates %}
           <article class="card candidate">
             {% if card.image_small_url %}
-              <img src="{{ card.image_small_url }}" alt="{{ card.name }}">
+              <img src="{{ card.image_small_url }}" alt="{{ card.name }}" loading="lazy" decoding="async">
             {% endif %}
             <div>
               <h2>{{ card.name }}</h2>

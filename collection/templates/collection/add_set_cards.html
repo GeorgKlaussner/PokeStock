@@ -41,7 +41,11 @@
 
   {% if progress and not progress.checklist_complete %}
     <section class="message warning section-gap">
-      Checklist is incomplete: {{ progress.cached_cards }} of {{ progress.total_cards }} cards are cached.
+      {% if checklist_refresh_queued %}
+        Checklist refresh queued. Reload shortly to see newly cached cards.
+      {% else %}
+        Checklist is incomplete: {{ progress.cached_cards }} of {{ progress.total_cards }} cards are cached.
+      {% endif %}
     </section>
   {% endif %}
 
@@ -53,7 +57,7 @@
         <summary class="set-card-summary">
           <div class="set-card-image-wrap">
             {% if item.card.image_small_url %}
-              <img src="{{ item.card.image_small_url }}" alt="{{ item.card.name }}">
+              <img src="{{ item.card.image_small_url }}" alt="{{ item.card.name }}" loading="lazy" decoding="async">
             {% else %}
               <div class="set-card-placeholder">{{ item.card.card_number }}</div>
             {% endif %}

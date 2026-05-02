@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -10,6 +11,7 @@ from django.db.models import Prefetch, Q
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from collection.forms import (
@@ -25,17 +27,22 @@ from collection.services.csv_io import export_owned_cards_response, import_owned
 from collection.services.ocr import OCRClient, OCRGuess, OCRServiceError, guess_from_ocr_text
 from collection.services.pokemon_tcg import PokemonTCGAPIError, PokemonTCGClient, upsert_card_metadata
 from collection.services.set_progress import (
+    SetProgress,
     cached_set_progresses,
-    ensure_set_checklist,
-    refresh_set_catalog,
-    refresh_set_metadata,
     set_card_progress,
 )
-from collection.tasks import process_ocr_job, refresh_card_metadata, refresh_owned_card_prices
+from collection.tasks import (
+    process_ocr_job,
+    refresh_card_metadata,
+    refresh_owned_card_prices,
+    refresh_set_catalog as refresh_set_catalog_task,
+    refresh_set_checklist,
+)
 
 
 SET_CHECKLIST_PAGE_SIZE = 48
 COLLECTION_PAGE_SIZE = 50
+SET_CHECKLIST_REFRESH_COOLDOWN = timedelta(minutes=5)
 
 
 @login_required
@@ -121,16 +128,18 @@ def add_search(request):
 @login_required
 def add_set_cards(request, set_id: str):
     set_metadata = get_object_or_404(SetMetadata, external_id=set_id)
-    try:
-        ensure_set_checklist(set_id)
-    except PokemonTCGAPIError as error:
-        messages.error(request, str(error))
     progress, cards = set_card_progress(set_id)
+    checklist_refresh_queued = _queue_set_checklist_refresh_if_needed(progress)
     page_obj = _paginate_set_cards(request, cards)
     return render(
         request,
         "collection/add_set_cards.html",
-        {"set_metadata": set_metadata, "progress": progress, "page_obj": page_obj},
+        {
+            "set_metadata": set_metadata,
+            "progress": progress,
+            "page_obj": page_obj,
+            "checklist_refresh_queued": checklist_refresh_queued,
+        },
     )
 
 
@@ -337,47 +346,38 @@ def sets_index(request):
 
 @login_required
 def set_detail(request, set_id: str):
-    try:
-        ensure_set_checklist(set_id)
-    except PokemonTCGAPIError as error:
-        messages.error(request, str(error))
     progress, cards = set_card_progress(set_id)
     if progress is None:
         return HttpResponseBadRequest("Unknown set.")
+    checklist_refresh_queued = _queue_set_checklist_refresh_if_needed(progress)
     page_obj = _paginate_set_cards(request, cards)
     return render(
         request,
         "collection/set_detail.html",
-        {"progress": progress, "page_obj": page_obj},
+        {
+            "progress": progress,
+            "page_obj": page_obj,
+            "checklist_refresh_queued": checklist_refresh_queued,
+        },
     )
 
 
 @login_required
 @require_POST
 def refresh_set(request, set_id: str):
-    if not (
-        SetMetadata.objects.filter(external_id=set_id).exists()
-        or CardMetadata.objects.filter(set_id=set_id).exists()
-    ):
+    progress, _ = set_card_progress(set_id)
+    if progress is None:
         return HttpResponseBadRequest("Unknown set.")
-    try:
-        count = refresh_set_metadata(set_id)
-    except PokemonTCGAPIError as error:
-        messages.error(request, str(error))
-    else:
-        messages.success(request, f"Refreshed {count} cards for this set.")
+    _queue_set_checklist_refresh_if_needed(progress, force=True)
+    messages.info(request, "Checklist refresh queued.")
     return redirect("set_detail", set_id=set_id)
 
 
 @login_required
 @require_POST
 def refresh_set_catalog_view(request):
-    try:
-        count = refresh_set_catalog()
-    except PokemonTCGAPIError as error:
-        messages.error(request, str(error))
-    else:
-        messages.success(request, f"Refreshed {count} PokemonTCG sets.")
+    refresh_set_catalog_task.delay()
+    messages.info(request, "Set catalog refresh queued.")
     return redirect(_safe_next(request, "sets_index"))
 
 
@@ -471,6 +471,46 @@ def _candidate_payload(card: CardMetadata) -> dict[str, str | None]:
         "edit_url": reverse("add_owned_card", args=[card.external_id]),
         "detail_url": reverse("card_detail", args=[card.external_id]),
     }
+
+
+def _queue_set_checklist_refresh_if_needed(progress: SetProgress | None, *, force: bool = False) -> bool:
+    if progress is None:
+        return False
+    if progress.checklist_complete and not force:
+        return False
+
+    set_metadata, _ = SetMetadata.objects.get_or_create(
+        external_id=progress.set_id,
+        defaults={
+            "name": progress.set_name or progress.set_id,
+            "series": progress.set_series,
+            "release_date": progress.release_date,
+        },
+    )
+    if not force and _has_recent_checklist_refresh(set_metadata):
+        return False
+
+    set_metadata.checklist_refresh_queued_at = timezone.now()
+    set_metadata.last_sync_error = ""
+    update_fields = ["checklist_refresh_queued_at", "last_sync_error", "updated_at"]
+    if not set_metadata.name:
+        set_metadata.name = progress.set_name or progress.set_id
+        update_fields.append("name")
+    if not set_metadata.series and progress.set_series:
+        set_metadata.series = progress.set_series
+        update_fields.append("series")
+    if set_metadata.release_date is None and progress.release_date is not None:
+        set_metadata.release_date = progress.release_date
+        update_fields.append("release_date")
+    set_metadata.save(update_fields=update_fields)
+    refresh_set_checklist.delay(progress.set_id)
+    return True
+
+
+def _has_recent_checklist_refresh(set_metadata: SetMetadata) -> bool:
+    if set_metadata.checklist_refresh_queued_at is None:
+        return False
+    return set_metadata.checklist_refresh_queued_at >= timezone.now() - SET_CHECKLIST_REFRESH_COOLDOWN
 
 
 def _safe_next(request, fallback_name: str) -> str:

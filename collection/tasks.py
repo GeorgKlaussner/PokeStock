@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from celery import shared_task
-from collection.models import CardMetadata, OCRJob, OwnedCard
+from django.utils import timezone
+
+from collection.models import CardMetadata, OCRJob, OwnedCard, SetMetadata
 from collection.services.ocr import OCRClient, guess_from_ocr_text
 from collection.services.pokemon_tcg import PokemonTCGAPIError, PokemonTCGClient, mark_sync_error, upsert_card_metadata
+from collection.services.set_progress import refresh_set_catalog as refresh_set_catalog_data
+from collection.services.set_progress import refresh_set_metadata
 
 
 @shared_task
@@ -31,6 +35,23 @@ def refresh_owned_card_prices() -> int:
         refresh_card_metadata(card_id)
         refreshed += 1
     return refreshed
+
+
+@shared_task
+def refresh_set_checklist(set_id: str) -> int | str:
+    try:
+        return refresh_set_metadata(set_id)
+    except PokemonTCGAPIError as error:
+        SetMetadata.objects.filter(external_id=set_id).update(
+            last_sync_attempt_at=timezone.now(),
+            last_sync_error=str(error),
+        )
+        return "failed"
+
+
+@shared_task
+def refresh_set_catalog() -> int:
+    return refresh_set_catalog_data()
 
 
 @shared_task
