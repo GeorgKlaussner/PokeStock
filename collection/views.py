@@ -21,7 +21,15 @@ from collection.forms import (
     OwnedCardForm,
     PhotoUploadForm,
 )
-from collection.models import CardCondition, CardMetadata, CardVariant, OCRJob, OwnedCard, SetMetadata
+from collection.models import (
+    DEFAULT_OWNED_CARD_LANGUAGE,
+    CardCondition,
+    CardMetadata,
+    CardVariant,
+    OCRJob,
+    OwnedCard,
+    SetMetadata,
+)
 from collection.services.aggregates import summarize_collection
 from collection.services.csv_io import export_owned_cards_response, import_owned_cards_csv_bytes
 from collection.services.ocr import OCRClient, OCRGuess, OCRServiceError, guess_from_ocr_text
@@ -273,7 +281,7 @@ def quick_add_card(request, external_id: str):
         card=card,
         variant=CardVariant.NORMAL,
         variant_custom="",
-        language="en",
+        language=DEFAULT_OWNED_CARD_LANGUAGE,
         condition=CardCondition.NEAR_MINT,
         purchase_price__isnull=True,
         purchase_date__isnull=True,
@@ -283,7 +291,7 @@ def quick_add_card(request, external_id: str):
         owned_card = OwnedCard(
             card=card,
             variant=CardVariant.NORMAL,
-            language="en",
+            language=DEFAULT_OWNED_CARD_LANGUAGE,
             condition=CardCondition.NEAR_MINT,
             quantity=1,
         )

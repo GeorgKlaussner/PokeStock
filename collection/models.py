@@ -36,6 +36,7 @@ language_validator = RegexValidator(
     regex=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$",
     message="Use a short language code such as en, de, or pt-BR.",
 )
+DEFAULT_OWNED_CARD_LANGUAGE = "de"
 
 
 class CardMetadata(models.Model):
@@ -121,7 +122,7 @@ class OwnedCard(models.Model):
     card = models.ForeignKey(CardMetadata, on_delete=models.CASCADE, related_name="owned_cards")
     variant = models.CharField(max_length=32, choices=CardVariant.choices, default=CardVariant.NORMAL)
     variant_custom = models.CharField(max_length=80, blank=True)
-    language = models.CharField(max_length=16, default="en", validators=[language_validator])
+    language = models.CharField(max_length=16, default=DEFAULT_OWNED_CARD_LANGUAGE, validators=[language_validator])
     condition = models.CharField(max_length=32, choices=CardCondition.choices, default=CardCondition.NEAR_MINT)
     quantity = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)

@@ -35,9 +35,9 @@ class AggregateTests(TestCase):
             price_value=Decimal("5.00"),
             api_synced_at=timezone.now() - timedelta(days=3),
         )
-        owned_card(card=priced, quantity=2)
-        owned_card(card=missing, quantity=3)
-        owned_card(card=stale, quantity=1)
+        owned_card(card=priced, language="en", quantity=2)
+        owned_card(card=missing, language="en", quantity=3)
+        owned_card(card=stale, language="en", quantity=1)
 
         summary = summarize_collection()
 
@@ -52,7 +52,7 @@ class AggregateTests(TestCase):
             latest_price_payload={"prices": {"trendPrice": 2.0, "reverseHoloTrend": 7.5}},
             price_value=Decimal("2.00"),
         )
-        owned = owned_card(card=card, variant=CardVariant.REVERSE_HOLOFOIL, quantity=2)
+        owned = owned_card(card=card, variant=CardVariant.REVERSE_HOLOFOIL, language="en", quantity=2)
 
         self.assertEqual(owned.unit_value, Decimal("7.50"))
         self.assertEqual(owned.row_value, Decimal("15.00"))

@@ -123,7 +123,7 @@ class CameraAddTests(TestCase):
         self.assertEqual(owned.card, card)
         self.assertEqual(owned.quantity, 1)
         self.assertEqual(owned.variant, CardVariant.NORMAL)
-        self.assertEqual(owned.language, "en")
+        self.assertEqual(owned.language, "de")
         self.assertEqual(owned.condition, CardCondition.NEAR_MINT)
 
     def test_quick_add_increments_existing_default_owned_card(self):
@@ -131,7 +131,7 @@ class CameraAddTests(TestCase):
         OwnedCard.objects.create(
             card=card,
             variant=CardVariant.NORMAL,
-            language="en",
+            language="de",
             condition=CardCondition.NEAR_MINT,
             quantity=2,
         )

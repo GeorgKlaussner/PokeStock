@@ -11,7 +11,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import HttpResponse
 
-from collection.models import CardCondition, CardMetadata, CardVariant, OwnedCard
+from collection.models import DEFAULT_OWNED_CARD_LANGUAGE, CardCondition, CardMetadata, CardVariant, OwnedCard
 from collection.services.pokemon_tcg import PokemonTCGAPIError, PokemonTCGClient, upsert_card_metadata
 
 
@@ -151,7 +151,7 @@ def _owned_from_row(card: CardMetadata, row: dict[str, str]) -> OwnedCard:
         card=card,
         variant=variant,
         variant_custom=row.get("variant_custom", ""),
-        language=row.get("language") or "en",
+        language=row.get("language") or DEFAULT_OWNED_CARD_LANGUAGE,
         condition=condition,
         quantity=_parse_int(row.get("quantity") or "1"),
         purchase_price=_parse_decimal(row.get("purchase_price")),

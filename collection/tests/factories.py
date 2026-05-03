@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from collection.models import CardMetadata, OwnedCard, SetMetadata
+from collection.models import DEFAULT_OWNED_CARD_LANGUAGE, CardMetadata, OwnedCard, SetMetadata
 
 
 def card_metadata(**overrides) -> CardMetadata:
@@ -51,7 +51,7 @@ def owned_card(**overrides) -> OwnedCard:
         "quantity": 1,
         "variant": "normal",
         "condition": "near_mint",
-        "language": "en",
+        "language": DEFAULT_OWNED_CARD_LANGUAGE,
     }
     defaults.update(overrides)
     return OwnedCard.objects.create(**defaults)

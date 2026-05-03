@@ -54,6 +54,18 @@ class CSVImportTests(TestCase):
         self.assertEqual(result.created_count, 1)
         self.assertEqual(OwnedCard.objects.get().variant, "holofoil")
 
+    def test_import_defaults_missing_language_to_german(self):
+        card_metadata(external_id="sv1-10", name="Pikachu", set_name="Scarlet & Violet", card_number="10")
+        csv_content = (
+            "card_id,name,set_name,card_number,variant,language,condition,quantity,purchase_price,purchase_date,notes\n"
+            "sv1-10,,,,normal,,near_mint,1,,,\n"
+        )
+
+        result = import_owned_cards_csv_bytes(csv_content.encode())
+
+        self.assertEqual(result.created_count, 1)
+        self.assertEqual(OwnedCard.objects.get().language, "de")
+
     def test_ambiguous_rows_require_review(self):
         card_metadata(external_id="a-1", name="Eevee", set_name="Promo", card_number="1")
         card_metadata(external_id="b-1", name="Eevee", set_name="Promo", card_number="1")
