@@ -49,33 +49,31 @@
 
   <section class="set-card-grid section-gap">
     {% for item in page_obj %}
-      <details class="set-card {% if not item.is_owned %}is-missing{% endif %}">
-        <summary class="set-card-summary">
-          <div class="set-card-image-wrap">
-            {% if item.card.image_small_url %}
-              <img src="{{ item.card.image_small_url }}" alt="{{ item.card.name }}" loading="lazy" decoding="async">
-            {% else %}
-              <div class="set-card-placeholder">{{ item.card.card_number }}</div>
-            {% endif %}
-            {% if item.is_owned %}
-              <span class="owned-badge">{{ item.owned_quantity }}</span>
-            {% endif %}
-          </div>
-          <span class="set-card-title">{{ item.card.name }}</span>
-          <span class="subtle">#{{ item.card.card_number }}{% if item.card.rarity %} - {{ item.card.rarity }}{% endif %}</span>
-        </summary>
-        <div class="set-card-body">
-          <div class="actions">
-            <a class="button secondary" href="{% url 'card_detail' item.card.external_id %}">Details</a>
+      <article id="card-{{ item.card.external_id }}" class="set-card {% if not item.is_owned %}is-missing{% endif %}">
+        <div class="set-card-image-wrap">
+          {% if item.card.image_small_url %}
+            <img src="{{ item.card.image_small_url }}" alt="{{ item.card.name }}" loading="lazy" decoding="async">
+          {% else %}
+            <div class="set-card-placeholder">{{ item.card.card_number }}</div>
+          {% endif %}
+          {% if item.is_owned %}
+            <span class="owned-badge">{{ item.owned_quantity }}</span>
+          {% endif %}
+          <div class="set-card-actions">
             <form method="post" action="{% url 'quick_add_card' item.card.external_id %}">
               {% csrf_token %}
-              <input type="hidden" name="next" value="{{ request.get_full_path }}">
-              <button type="submit">Quick add</button>
+              <input type="hidden" name="next" value="{{ request.get_full_path }}#card-{{ item.card.external_id }}">
+              <button class="set-card-action primary" type="submit">Quick add</button>
             </form>
-            <a class="button secondary" href="{% url 'add_owned_card' item.card.external_id %}">Edit</a>
+            <a class="set-card-action" href="{% url 'add_owned_card' item.card.external_id %}">Edit</a>
+            <a class="set-card-action" href="{% url 'card_detail' item.card.external_id %}">Details</a>
           </div>
         </div>
-      </details>
+        <div class="set-card-summary">
+          <span class="set-card-title">{{ item.card.name }}</span>
+          <span class="subtle">#{{ item.card.card_number }}{% if item.card.rarity %} - {{ item.card.rarity }}{% endif %}</span>
+        </div>
+      </article>
     {% empty %}
       <section class="card">
         <p class="subtle">No cards cached for this set.</p>

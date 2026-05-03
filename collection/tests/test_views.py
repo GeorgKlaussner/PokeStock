@@ -134,8 +134,13 @@ class ManualAddFlowTests(TestCase):
         self.assertContains(index_response, "1 / 2 owned")
         self.assertContains(detail_response, "Sprigatito")
         self.assertContains(detail_response, "is-missing")
-        self.assertContains(detail_response, "<details class=\"set-card", html=False)
-        self.assertContains(detail_response, f'name="next" value="{reverse("set_detail", args=["sv1"])}"', html=False)
+        self.assertContains(detail_response, "<article id=\"card-sv1-1\" class=\"set-card", html=False)
+        self.assertContains(
+            detail_response,
+            f'name="next" value="{reverse("set_detail", args=["sv1"])}#card-sv1-1"',
+            html=False,
+        )
+        self.assertContains(detail_response, "set-card-actions", html=False)
 
     def test_sets_index_only_lists_sets_with_owned_cards(self):
         owned_card_metadata = card_metadata(

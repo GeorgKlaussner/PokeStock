@@ -668,24 +668,21 @@ textarea {
   border-radius: var(--radius);
   box-shadow: 0 8px 20px rgba(17, 24, 39, 0.06);
   overflow: hidden;
+  scroll-margin-top: 1rem;
 }
 
-.set-card[open] {
+.set-card:focus-within,
+.set-card:hover {
   border-color: rgba(15, 118, 110, 0.35);
   box-shadow: 0 10px 24px rgba(15, 118, 110, 0.12);
 }
 
 .set-card-summary {
   color: var(--text);
-  cursor: pointer;
   display: grid;
   gap: 0.55rem;
   list-style: none;
   padding: 0.65rem;
-}
-
-.set-card-summary::-webkit-details-marker {
-  display: none;
 }
 
 .set-card-title {
@@ -693,17 +690,13 @@ textarea {
   line-height: 1.25;
 }
 
-.set-card-body {
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 0.5rem;
-  padding: 0.65rem;
+.set-card-summary p {
+  margin: 0;
 }
 
 .set-card-image-wrap {
   aspect-ratio: 245 / 342;
   background: var(--surface-muted);
-  border-radius: var(--radius);
   overflow: hidden;
   position: relative;
 }
@@ -727,6 +720,63 @@ textarea {
   font-weight: 800;
   height: 100%;
   justify-content: center;
+}
+
+.set-card-actions {
+  align-items: end;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0) 0%, rgba(17, 24, 39, 0.72) 100%);
+  bottom: 0;
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: 1fr 1fr;
+  left: 0;
+  opacity: 0;
+  padding: 3.5rem 0.55rem 0.55rem;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  transform: translateY(0.35rem);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.set-card:hover .set-card-actions,
+.set-card:focus-within .set-card-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.set-card-actions form {
+  display: contents;
+}
+
+.set-card-action {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.5rem;
+  text-align: center;
+}
+
+.set-card-action.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  grid-column: 1 / -1;
+}
+
+.set-card-action:hover {
+  filter: brightness(0.97);
+  text-decoration: none;
 }
 
 .owned-badge {
@@ -778,6 +828,14 @@ textarea {
 @media (max-width: 1120px) {
   .stats-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (hover: none) {
+  .set-card-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
   }
 }
 
