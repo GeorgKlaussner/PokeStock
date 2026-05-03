@@ -7,17 +7,30 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from collection.models import SetMetadata
-from collection.services.pokemon_tcg import PokemonTCGClient, build_search_query, upsert_card_metadata, upsert_set_metadata
+from collection.services.pokemon_tcg import (
+    PokemonTCGClient,
+    build_search_query,
+    parse_set_number_search,
+    upsert_card_metadata,
+    upsert_set_metadata,
+)
 
 
 class PokemonTCGClientTests(TestCase):
     def test_build_search_query_escapes_phrases(self):
-        query = build_search_query(query='Mr. "Mime"', set_name="Base", card_number="6", rarity="Rare")
+        query = build_search_query(query='Mr. "Mime"', set_name="Base", card_number="006", rarity="Rare")
 
         self.assertIn('name:"Mr. \\"Mime\\""', query)
         self.assertIn('set.name:"Base"', query)
         self.assertIn('number:"6"', query)
         self.assertIn('rarity:"Rare"', query)
+
+    def test_parse_set_number_search_accepts_ptcgo_code_and_number(self):
+        parsed = parse_set_number_search("mew 004")
+
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed.set_token, "mew")
+        self.assertEqual(parsed.card_number, "004")
 
     def test_search_cards_uses_api_payload_data(self):
         class StubClient(PokemonTCGClient):
@@ -34,6 +47,29 @@ class PokemonTCGClientTests(TestCase):
         self.assertEqual(client.path, "/cards")
         self.assertEqual(client.params["pageSize"], "5")
         self.assertEqual(client.params["page"], "1")
+
+    def test_search_cards_resolves_set_code_number_queries(self):
+        class StubClient(PokemonTCGClient):
+            def __init__(self):
+                super().__init__(base_url="https://example.test", api_key="")
+                self.requests = []
+
+            def _get(self, path, params):
+                self.requests.append((path, params))
+                if path == "/sets" and params["q"] == 'ptcgoCode:"MEW"':
+                    return {"data": [{"id": "sv3pt5", "name": "151", "ptcgoCode": "MEW"}]}
+                if path == "/sets":
+                    return {"data": []}
+                if path == "/cards":
+                    return {"data": [{"id": "sv3pt5-4", "name": "Charmander"}]}
+                return {"data": []}
+
+        client = StubClient()
+
+        data = client.search_cards(query="mew 004")
+
+        self.assertEqual(data, [{"id": "sv3pt5-4", "name": "Charmander"}])
+        self.assertIn(("/cards", {"q": 'set.id:"sv3pt5" number:"4"', "page": "1", "pageSize": "20", "orderBy": "number"}), client.requests)
 
     def test_api_requests_use_unverified_ssl_context(self):
         class Response:
@@ -144,3 +180,27 @@ class PokemonTCGClientTests(TestCase):
         self.assertEqual(card.price_value, Decimal("1.10"))
         self.assertEqual(card.price_source_field, "averageSellPrice")
         self.assertTrue(SetMetadata.objects.filter(external_id="sv1").exists())
+
+    def test_upsert_suppresses_known_bad_cardmarket_mapping_prices(self):
+        card = upsert_card_metadata(
+            {
+                "id": "sv3pt5-4",
+                "name": "Charmander",
+                "number": "4",
+                "rarity": "Common",
+                "updatedAt": "2026/05/03",
+                "set": {"id": "sv3pt5", "name": "151", "series": "Scarlet & Violet", "releaseDate": "2023/09/22"},
+                "cardmarket": {
+                    "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-4",
+                    "prices": {"averageSellPrice": 113.18, "trendPrice": 140.08},
+                },
+            }
+        )
+
+        self.assertIsNone(card.price_value)
+        self.assertEqual(card.price_source_field, "")
+        self.assertEqual(card.latest_price_payload["prices"], {})
+        self.assertEqual(
+            card.cardmarket_url,
+            "https://www.cardmarket.com/en/Pokemon/Products/Singles/151/Charmander-V1-MEW004",
+        )

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
+import re
 import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
 from django.conf import settings
+from django.db.models import Q
 from django.utils import timezone
 
 from collection.models import CardMetadata, SetMetadata
@@ -17,6 +20,19 @@ from collection.services.pricing import select_cardmarket_price
 
 class PokemonTCGAPIError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class SetNumberSearch:
+    set_token: str
+    card_number: str
+
+
+KNOWN_BAD_CARDMARKET_PRICE_IDS = {"sv3pt5-1", "sv3pt5-4"}
+CARDMARKET_URL_OVERRIDES = {
+    "sv3pt5-1": "https://www.cardmarket.com/en/Pokemon/Products/Singles/151/Bulbasaur-V1-MEW001",
+    "sv3pt5-4": "https://www.cardmarket.com/en/Pokemon/Products/Singles/151/Charmander-V1-MEW004",
+}
 
 
 class PokemonTCGClient:
@@ -35,6 +51,17 @@ class PokemonTCGClient:
         page_size: int = 20,
         page: int = 1,
     ) -> list[dict[str, Any]]:
+        set_number_search = parse_set_number_search(query)
+        if set_number_search and not any(value.strip() for value in (set_name, card_number, rarity)):
+            cards = self.search_cards_by_set_token_and_number(
+                set_token=set_number_search.set_token,
+                card_number=set_number_search.card_number,
+                page_size=page_size,
+                page=page,
+            )
+            if cards:
+                return cards
+
         search_query = build_search_query(
             query=query,
             set_name=set_name,
@@ -46,6 +73,57 @@ class PokemonTCGClient:
             params["q"] = search_query
         payload = self._get("/cards", params)
         return payload.get("data", [])
+
+    def search_cards_by_set_token_and_number(
+        self,
+        *,
+        set_token: str,
+        card_number: str,
+        page_size: int = 20,
+        page: int = 1,
+    ) -> list[dict[str, Any]]:
+        for set_id in self.resolve_set_ids(set_token):
+            for number in card_number_query_values(card_number):
+                query = f'set.id:"{_lucene_phrase(set_id)}" number:"{_lucene_phrase(number)}"'
+                payload = self.get_cards_page(query=query, page=page, page_size=page_size)
+                cards = payload.get("data", [])
+                if cards:
+                    return cards
+        return []
+
+    def resolve_set_ids(self, set_token: str) -> list[str]:
+        normalized = set_token.strip()
+        if not normalized:
+            return []
+
+        set_ids: list[str] = []
+        seen: set[str] = set()
+
+        for set_id in SetMetadata.objects.filter(
+            Q(external_id__iexact=normalized) | Q(name__iexact=normalized)
+        ).values_list("external_id", flat=True):
+            if set_id not in seen:
+                set_ids.append(set_id)
+                seen.add(set_id)
+        if set_ids:
+            return set_ids
+
+        for query in set_lookup_queries(normalized):
+            payload = self._get(
+                "/sets",
+                {
+                    "q": query,
+                    "page": "1",
+                    "pageSize": "10",
+                    "orderBy": "-releaseDate",
+                },
+            )
+            for set_data in payload.get("data", []):
+                set_id = set_data.get("id", "")
+                if set_id and set_id not in seen:
+                    set_ids.append(set_id)
+                    seen.add(set_id)
+        return set_ids
 
     def get_card(self, external_id: str) -> dict[str, Any]:
         payload = self._get(f"/cards/{urllib.parse.quote(external_id)}", {})
@@ -134,14 +212,61 @@ def build_search_query(*, query: str = "", set_name: str = "", card_number: str 
     if set_name.strip():
         terms.append(f'set.name:"{_lucene_phrase(set_name.strip())}"')
     if card_number.strip():
-        terms.append(f'number:"{_lucene_phrase(card_number.strip())}"')
+        terms.append(f'number:"{_lucene_phrase(normalize_card_number(card_number))}"')
     if rarity.strip():
         terms.append(f'rarity:"{_lucene_phrase(rarity.strip())}"')
     return " ".join(terms)
 
 
+def parse_set_number_search(query: str) -> SetNumberSearch | None:
+    normalized = query.strip()
+    if not normalized:
+        return None
+
+    parts = normalized.split()
+    if len(parts) == 2 and _looks_like_set_token(parts[0]) and _looks_like_card_number(parts[1]):
+        return SetNumberSearch(parts[0], parts[1])
+
+    match = re.fullmatch(r"([A-Za-z][A-Za-z0-9]{1,9})[-#\s]*(\d+[A-Za-z]?)", normalized)
+    if match:
+        return SetNumberSearch(match.group(1), match.group(2))
+
+    return None
+
+
+def set_lookup_queries(set_token: str) -> list[str]:
+    escaped = _lucene_phrase(set_token)
+    queries = [
+        f'id:"{escaped}"',
+        f'ptcgoCode:"{_lucene_phrase(set_token.upper())}"',
+        f'name:"{escaped}"',
+    ]
+    return list(dict.fromkeys(queries))
+
+
+def card_number_query_values(card_number: str) -> list[str]:
+    normalized = normalize_card_number(card_number)
+    original = card_number.strip()
+    return list(dict.fromkeys([normalized, original]))
+
+
+def normalize_card_number(card_number: str) -> str:
+    value = card_number.strip()
+    if value.isdecimal():
+        return value.lstrip("0") or "0"
+    return value
+
+
 def _lucene_phrase(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _looks_like_set_token(value: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9]{1,9}", value.strip()))
+
+
+def _looks_like_card_number(value: str) -> bool:
+    return bool(re.fullmatch(r"\d+[A-Za-z]?", value.strip()))
 
 
 def upsert_set_metadata(set_data: dict[str, Any]) -> SetMetadata | None:
@@ -173,7 +298,7 @@ def upsert_card_metadata(card_data: dict[str, Any], *, variant_for_price: str = 
     external_id = card_data["id"]
     set_data = card_data.get("set") or {}
     images = card_data.get("images") or {}
-    cardmarket = card_data.get("cardmarket") or {}
+    cardmarket = _cardmarket_payload_for_storage(external_id, card_data.get("cardmarket") or {})
     price = select_cardmarket_price(cardmarket, variant_for_price)
     release_date = _parse_date(set_data.get("releaseDate"))
     upsert_set_metadata(set_data)
@@ -190,7 +315,7 @@ def upsert_card_metadata(card_data: dict[str, Any], *, variant_for_price: str = 
             "image_small_url": images.get("small", ""),
             "image_large_url": images.get("large", ""),
             "release_date": release_date,
-            "cardmarket_url": cardmarket.get("url", ""),
+            "cardmarket_url": CARDMARKET_URL_OVERRIDES.get(external_id, cardmarket.get("url", "")),
             "latest_price_payload": cardmarket,
             "api_updated_at": card_data.get("updatedAt", ""),
             "api_synced_at": timezone.now(),
@@ -203,6 +328,12 @@ def upsert_card_metadata(card_data: dict[str, Any], *, variant_for_price: str = 
         },
     )
     return card
+
+
+def _cardmarket_payload_for_storage(external_id: str, cardmarket: dict[str, Any]) -> dict[str, Any]:
+    if external_id not in KNOWN_BAD_CARDMARKET_PRICE_IDS:
+        return cardmarket
+    return {**cardmarket, "prices": {}}
 
 
 def mark_sync_error(card: CardMetadata, message: str) -> None:
