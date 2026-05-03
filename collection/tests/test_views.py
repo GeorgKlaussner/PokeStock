@@ -135,6 +135,7 @@ class ManualAddFlowTests(TestCase):
         self.assertContains(detail_response, "Sprigatito")
         self.assertContains(detail_response, "is-missing")
         self.assertContains(detail_response, "<article id=\"card-sv1-1\" class=\"set-card", html=False)
+        self.assertContains(detail_response, "set-card-link", html=False)
         self.assertContains(
             detail_response,
             f'name="next" value="{reverse("set_detail", args=["sv1"])}#card-sv1-1"',

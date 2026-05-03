@@ -668,6 +668,7 @@ textarea {
   border-radius: var(--radius);
   box-shadow: 0 8px 20px rgba(17, 24, 39, 0.06);
   overflow: hidden;
+  position: relative;
   scroll-margin-top: 1rem;
 }
 
@@ -683,6 +684,20 @@ textarea {
   gap: 0.55rem;
   list-style: none;
   padding: 0.65rem;
+  pointer-events: none;
+  position: relative;
+  z-index: 1;
+}
+
+.set-card-link {
+  inset: 0;
+  position: absolute;
+  z-index: 1;
+}
+
+.set-card-link:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.45);
+  outline-offset: -3px;
 }
 
 .set-card-title {
@@ -735,8 +750,9 @@ textarea {
   pointer-events: none;
   position: absolute;
   right: 0;
-  transform: translateY(0.35rem);
+  transform: translateY(0);
   transition: opacity 160ms ease, transform 160ms ease;
+  z-index: 3;
 }
 
 .set-card:hover .set-card-actions,

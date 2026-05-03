@@ -54,6 +54,7 @@
   <section class="set-card-grid section-gap">
     {% for item in page_obj %}
       <article id="card-{{ item.card.external_id }}" class="set-card {% if not item.is_owned %}is-missing{% endif %}">
+        <a class="set-card-link" href="{% url 'card_detail' item.card.external_id %}" aria-label="Open {{ item.card.name }} details"></a>
         <div class="set-card-image-wrap">
           {% if item.card.image_small_url %}
             <img src="{{ item.card.image_small_url }}" alt="{{ item.card.name }}" loading="lazy" decoding="async">
