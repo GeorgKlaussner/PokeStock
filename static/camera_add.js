@@ -150,6 +150,11 @@
     csrf.name = "csrfmiddlewaretoken";
     csrf.value = csrfToken;
     form.appendChild(csrf);
+    const next = document.createElement("input");
+    next.type = "hidden";
+    next.name = "next";
+    next.value = `${window.location.pathname}${window.location.search}`;
+    form.appendChild(next);
     const addButton = document.createElement("button");
     addButton.type = "submit";
     addButton.textContent = "Quick add";

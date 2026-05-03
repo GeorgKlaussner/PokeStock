@@ -116,9 +116,9 @@ class CameraAddTests(TestCase):
     def test_quick_add_uses_default_owned_card_details(self):
         card = card_metadata(external_id="sv1-25", name="Miraidon")
 
-        response = self.client.post(reverse("quick_add_card", args=[card.external_id]))
+        response = self.client.post(reverse("quick_add_card", args=[card.external_id]), {"next": reverse("camera_add")})
 
-        self.assertRedirects(response, reverse("card_detail", args=[card.external_id]))
+        self.assertRedirects(response, reverse("camera_add"))
         owned = OwnedCard.objects.get()
         self.assertEqual(owned.card, card)
         self.assertEqual(owned.quantity, 1)
@@ -136,8 +136,21 @@ class CameraAddTests(TestCase):
             quantity=2,
         )
 
-        response = self.client.post(reverse("quick_add_card", args=[card.external_id]))
+        response = self.client.post(
+            reverse("quick_add_card", args=[card.external_id]),
+            HTTP_REFERER=f"http://testserver{reverse('camera_add')}",
+        )
 
-        self.assertRedirects(response, reverse("card_detail", args=[card.external_id]))
+        self.assertRedirects(response, reverse("camera_add"))
         owned = OwnedCard.objects.get()
         self.assertEqual(owned.quantity, 3)
+
+    def test_quick_add_ignores_external_referer(self):
+        card = card_metadata(external_id="sv1-25", name="Miraidon")
+
+        response = self.client.post(
+            reverse("quick_add_card", args=[card.external_id]),
+            HTTP_REFERER="https://example.test/camera/",
+        )
+
+        self.assertRedirects(response, reverse("card_detail", args=[card.external_id]))

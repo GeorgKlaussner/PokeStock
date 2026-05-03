@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -269,13 +269,14 @@ def delete_owned_card(request, owned_id: int):
 @login_required
 @require_POST
 def quick_add_card(request, external_id: str):
+    return_url = _safe_return_url(request)
     card = CardMetadata.objects.filter(external_id=external_id).first()
     if card is None:
         try:
             card = upsert_card_metadata(PokemonTCGClient().get_card(external_id))
         except PokemonTCGAPIError as error:
             messages.error(request, str(error))
-            return redirect("camera_add")
+            return redirect(return_url or reverse("camera_add"))
 
     owned_card = OwnedCard.objects.filter(
         card=card,
@@ -302,7 +303,7 @@ def quick_add_card(request, external_id: str):
         owned_card.full_clean()
         owned_card.save(update_fields=["quantity", "updated_at"])
     messages.success(request, f"Added {card.name} to your collection.")
-    return redirect("card_detail", external_id=card.external_id)
+    return redirect(return_url or reverse("card_detail", args=[card.external_id]))
 
 
 @login_required
@@ -523,6 +524,26 @@ def _has_recent_checklist_refresh(set_metadata: SetMetadata) -> bool:
 
 def _safe_next(request, fallback_name: str) -> str:
     return _safe_url(request.POST.get("next", "")) or reverse(fallback_name)
+
+
+def _safe_return_url(request) -> str:
+    next_url = _safe_url(request.POST.get("next", ""))
+    if next_url:
+        return next_url
+
+    referer = request.META.get("HTTP_REFERER", "")
+    if not referer:
+        return ""
+
+    parsed = urlsplit(referer)
+    if not parsed.netloc:
+        return _safe_url(referer)
+    if parsed.netloc != request.get_host():
+        return ""
+    path = parsed.path or "/"
+    if parsed.query:
+        return f"{path}?{parsed.query}"
+    return path
 
 
 def _safe_url(value: str) -> str:

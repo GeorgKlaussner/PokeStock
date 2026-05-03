@@ -135,6 +135,7 @@ class ManualAddFlowTests(TestCase):
         self.assertContains(detail_response, "Sprigatito")
         self.assertContains(detail_response, "is-missing")
         self.assertContains(detail_response, "<details class=\"set-card", html=False)
+        self.assertContains(detail_response, f'name="next" value="{reverse("set_detail", args=["sv1"])}"', html=False)
 
     def test_sets_index_only_lists_sets_with_owned_cards(self):
         owned_card_metadata = card_metadata(
