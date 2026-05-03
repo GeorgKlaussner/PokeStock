@@ -1,6 +1,7 @@
 (() => {
   const prefetched = new Set();
   const idle = window.requestIdleCallback || ((callback) => window.setTimeout(callback, 250));
+  const scrollKey = `pokestock:scroll:${window.location.pathname}${window.location.search}`;
 
   function linkURL(link) {
     try {
@@ -77,12 +78,45 @@
     link.setAttribute("aria-busy", "true");
   }
 
+  function rememberScroll(event) {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
+    const form = event.target.closest("form[data-preserve-scroll]");
+    if (!form) {
+      return;
+    }
+
+    sessionStorage.setItem(scrollKey, String(Math.max(0, Math.round(window.scrollY))));
+  }
+
+  function restoreScroll() {
+    const value = sessionStorage.getItem(scrollKey);
+    if (value === null) {
+      return;
+    }
+    sessionStorage.removeItem(scrollKey);
+
+    const offset = Number.parseInt(value, 10);
+    if (!Number.isFinite(offset)) {
+      return;
+    }
+
+    const scrollToOffset = () => window.scrollTo({ top: offset, left: 0, behavior: "instant" });
+    window.requestAnimationFrame(scrollToOffset);
+    window.setTimeout(scrollToOffset, 80);
+  }
+
   document.addEventListener("pointerover", prefetchFromEvent);
   document.addEventListener("focusin", prefetchFromEvent);
   document.addEventListener("touchstart", prefetchFromEvent, { passive: true });
   document.addEventListener("click", markNavigating);
+  document.addEventListener("submit", rememberScroll);
 
   idle(() => {
     document.querySelectorAll(".side-nav a[href], .mobile-tabbar a[href]").forEach(prefetch);
   });
+
+  restoreScroll();
 })();

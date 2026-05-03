@@ -61,9 +61,9 @@
             <span class="owned-badge">{{ item.owned_quantity }}</span>
           {% endif %}
           <div class="set-card-actions">
-            <form method="post" action="{% url 'quick_add_card' item.card.external_id %}">
+            <form method="post" action="{% url 'quick_add_card' item.card.external_id %}" data-preserve-scroll>
               {% csrf_token %}
-              <input type="hidden" name="next" value="{{ request.get_full_path }}#card-{{ item.card.external_id }}">
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
               <button class="set-card-action primary" type="submit">Quick add</button>
             </form>
             <a class="set-card-action" href="{% url 'add_owned_card' item.card.external_id %}">Edit</a>

@@ -138,9 +138,10 @@ class ManualAddFlowTests(TestCase):
         self.assertContains(detail_response, "set-card-link", html=False)
         self.assertContains(
             detail_response,
-            f'name="next" value="{reverse("set_detail", args=["sv1"])}#card-sv1-1"',
+            f'name="next" value="{reverse("set_detail", args=["sv1"])}"',
             html=False,
         )
+        self.assertContains(detail_response, "data-preserve-scroll", html=False)
         self.assertContains(detail_response, "set-card-actions", html=False)
 
     def test_sets_index_only_lists_sets_with_owned_cards(self):
